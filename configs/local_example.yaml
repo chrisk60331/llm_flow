@@ -1,0 +1,28 @@
+data:
+  csv_path: "data/saas.csv"
+  text_fields:
+    - question
+    - answer_tolkien
+  separator: "\n\n"
+  validation_split: 0.2
+  seed: 13
+  max_length: 256
+model:
+  pretrained_model_name: "distilbert-base-uncased"
+  freeze_embedding: false
+  freeze_encoder_layers: 0
+training:
+  output_dir: "artifacts/distilbert-saas"
+  num_train_epochs: 25
+  per_device_train_batch_size: 8
+  per_device_eval_batch_size: 8
+  learning_rate: 5e-5
+  weight_decay: 0.01
+  warmup_ratio: 0.1
+  logging_steps: 5
+  eval_steps: 20
+  save_steps: 100
+  save_total_limit: 3
+  gradient_accumulation_steps: 1
+  max_steps: -1
+
