@@ -47,8 +47,8 @@ def generate_synthetic_features(n: int = 100, seed: int = 42) -> list[MetaFeatur
         weight_decay = random.choice([0.0, 0.01, 0.1])
         max_length = random.choice([256, 512, 1024, 2048])
         lora_enabled = random.choice([True, False])
-        lora_r = random.choice([4, 8, 16, 32]) if lora_enabled else None
-        lora_alpha = lora_r * 2 if lora_r else None
+        lora_r = random.choice([8, 16, 32, 64]) if lora_enabled else None
+        lora_alpha = lora_r * 2 if lora_r else None  # e.g., 64 -> 128
         
         # Dataset features
         avg_text_length = random.uniform(100, 2000)
@@ -105,9 +105,11 @@ def generate_synthetic_features(n: int = 100, seed: int = 42) -> list[MetaFeatur
         if learning_rate > 1e-4 and n_samples < 100:
             bleu -= 15
         
-        # LoRA generally helps with small datasets
-        if lora_enabled and n_samples < 500:
-            bleu += 5
+        # LoRA generally helps, higher r/alpha values tend to perform better
+        if lora_enabled:
+            bleu += 3
+            if lora_r and lora_r >= 64:
+                bleu += 4  # higher r captures more adaptation capacity
         
         # More epochs can help (diminishing returns)
         bleu += 3 * min(num_epochs, 3)
@@ -117,6 +119,10 @@ def generate_synthetic_features(n: int = 100, seed: int = 42) -> list[MetaFeatur
         
         # Clamp to valid range
         bleu = max(0.0, min(100.0, bleu))
+        
+        # ROUGE-L is typically correlated with BLEU but slightly higher
+        rouge = bleu * random.uniform(1.0, 1.15) + random.gauss(0, 3)
+        rouge = max(0.0, min(100.0, rouge))
         
         results.append(MetaFeatureVector(
             experiment_id=f"synthetic_{uuid.uuid4().hex[:8]}",
@@ -152,6 +158,7 @@ def generate_synthetic_features(n: int = 100, seed: int = 42) -> list[MetaFeatur
             probe_grad_norm_std=probe_grad_norm_std,
             # Target
             final_bleu_score=bleu,
+            final_rouge_score=rouge,
             final_eval_loss=probe_final_loss * random.uniform(0.8, 1.2),
         ))
     

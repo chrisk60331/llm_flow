@@ -1,11 +1,14 @@
 """Benchmark and evaluation API routes."""
 from __future__ import annotations
 
+import logging
 import uuid
 from pathlib import Path
 from threading import Thread
 
 from fastapi import APIRouter, HTTPException
+
+logger = logging.getLogger(__name__)
 
 from ..benchmark import compute_bleu_score, compute_rouge_l_score, generate_response, load_model_and_tokenizer
 from ..models import (
@@ -267,14 +270,17 @@ def delete_evaluation(eval_id: str) -> dict[str, str]:
 # Exported for use in experiment_routes and autotune_routes
 def _run_benchmark_eval_sync(eval_id: str, benchmark: Benchmark, experiment: ExperimentResult) -> None:
     """Run benchmark evaluation synchronously."""
+    logger.info(f"Benchmark eval {eval_id}: Starting evaluation for experiment {experiment.id}")
     eval_result = get_benchmark_eval(eval_id)
     eval_result.status = BenchmarkStatus.RUNNING
     save_benchmark_eval(eval_result)
 
     try:
         model_path = Path(experiment.output_dir)
+        logger.info(f"Benchmark eval {eval_id}: Loading model from {model_path}")
         model, tokenizer = load_model_and_tokenizer(model_path)
 
+        logger.info(f"Benchmark eval {eval_id}: Generating response")
         model_answer = generate_response(
             model=model,
             tokenizer=tokenizer,
@@ -283,15 +289,18 @@ def _run_benchmark_eval_sync(eval_id: str, benchmark: Benchmark, experiment: Exp
             temperature=benchmark.temperature,
             top_p=benchmark.top_p,
         )
+        logger.info(f"Benchmark eval {eval_id}: Model answer length={len(model_answer)}")
 
         bleu_score = compute_bleu_score(model_answer, benchmark.gold_answer)
         rouge_score = compute_rouge_l_score(model_answer, benchmark.gold_answer)
+        logger.info(f"Benchmark eval {eval_id}: BLEU={bleu_score:.2f}, ROUGE={rouge_score:.2f}")
 
         eval_result.model_answer = model_answer
         eval_result.bleu_score = bleu_score
         eval_result.rouge_score = rouge_score
         eval_result.status = BenchmarkStatus.COMPLETED
     except Exception as e:
+        logger.exception(f"Benchmark eval {eval_id}: Failed with error: {e}")
         eval_result.status = BenchmarkStatus.FAILED
         eval_result.error = str(e)
     finally:

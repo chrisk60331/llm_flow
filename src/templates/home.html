@@ -383,44 +383,52 @@
         try {
             const resp = await fetch('/api/autotune/' + currentAutotuneJobId);
             const data = await resp.json();
+            const job = data.job;
             
             // Update status badge
-            document.getElementById('at-status-badge').textContent = data.status;
-            if (data.status === 'completed') {
+            document.getElementById('at-status-badge').textContent = job.status;
+            if (job.status === 'completed') {
                 document.getElementById('at-status-badge').className = 'badge badge-green';
-            } else if (data.status === 'failed') {
+            } else if (job.status === 'failed') {
                 document.getElementById('at-status-badge').className = 'badge badge-red';
             } else {
                 document.getElementById('at-status-badge').className = 'badge badge-blue';
             }
             
             // Update phase message
-            if (data.phase_message) {
-                document.getElementById('at-phase').textContent = 'Phase: ' + data.phase_message;
-                document.getElementById('at-message').textContent = data.phase_message;
+            if (job.phase_message) {
+                document.getElementById('at-phase').textContent = 'Phase: ' + job.phase_message;
+                document.getElementById('at-message').textContent = job.phase_message;
             }
             
             // Update candidates if available
-            if (data.candidates && data.candidates.length > 0) {
-                updateCandidatesTable(data.candidates);
+            if (job.candidates && job.candidates.length > 0) {
+                updateCandidatesTable(job.candidates);
             }
             
-            // Calculate progress
+            // Calculate progress based on status and training progress
             let progress = 10;
-            if (data.status === 'probing') progress = 30;
-            else if (data.status === 'training') progress = 50 + (data.trained_count || 0) * 10;
-            else if (data.status === 'evaluating') progress = 80;
-            else if (data.status === 'completed') progress = 100;
+            const totalCandidates = job.top_k || 5;
+            if (job.status === 'probing') progress = 30;
+            else if (job.status === 'training') {
+                const trainedCount = job.current_training_idx || 0;
+                progress = 30 + Math.floor((trainedCount / totalCandidates) * 40);
+            }
+            else if (job.status === 'evaluating') {
+                const evalCount = job.current_eval_idx || 0;
+                progress = 70 + Math.floor((evalCount / totalCandidates) * 25);
+            }
+            else if (job.status === 'completed') progress = 100;
             document.getElementById('at-progress-bar').style.width = progress + '%';
             
-            if (data.status === 'completed') {
+            if (job.status === 'completed') {
                 clearInterval(autotunePollingInterval);
                 autotunePollingInterval = null;
-                showAutotuneComplete(data);
-            } else if (data.status === 'failed') {
+                showAutotuneComplete(job);
+            } else if (job.status === 'failed') {
                 clearInterval(autotunePollingInterval);
                 autotunePollingInterval = null;
-                showAutotuneError(data.error || 'AutoTune failed');
+                showAutotuneError(job.error || 'AutoTune failed');
             }
             
         } catch (error) {
@@ -437,12 +445,12 @@
             const row = document.createElement('tr');
             row.className = 'hover:bg-gray-50 dark:hover:bg-gray-700';
             row.innerHTML = `
-                <td class="px-3 py-2 font-medium">${idx + 1}</td>
+                <td class="px-3 py-2 font-medium">${c.rank || (idx + 1)}</td>
                 <td class="px-3 py-2 font-mono text-xs">${c.learning_rate ? c.learning_rate.toExponential(0) : '-'}</td>
                 <td class="px-3 py-2">${c.lora_r || '-'}</td>
                 <td class="px-3 py-2">${c.batch_size || '-'}</td>
-                <td class="px-3 py-2 font-mono text-purple-600">${c.predicted_score ? c.predicted_score.toFixed(2) : '-'}</td>
-                <td class="px-3 py-2 font-mono text-emerald-600 font-bold">${c.actual_score ? c.actual_score.toFixed(2) : '-'}</td>
+                <td class="px-3 py-2 font-mono text-purple-600">${c.predicted_bleu != null ? c.predicted_bleu.toFixed(2) : '-'}</td>
+                <td class="px-3 py-2 font-mono text-emerald-600 font-bold">${c.actual_bleu != null ? c.actual_bleu.toFixed(2) : '-'}</td>
             `;
             tbody.appendChild(row);
         });

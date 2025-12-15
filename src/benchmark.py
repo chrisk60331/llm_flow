@@ -1,6 +1,7 @@
 """Benchmark evaluation with BLEU and ROUGE-L scoring."""
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import evaluate
@@ -8,6 +9,8 @@ import torch
 from peft import AutoPeftModelForCausalLM
 from sacrebleu.metrics import BLEU
 from transformers import AutoTokenizer
+
+logger = logging.getLogger(__name__)
 
 
 def _preferred_device() -> torch.device:
@@ -69,7 +72,9 @@ def generate_response(
     with torch.no_grad():
         output = model.generate(**encoded, **generation_kwargs)
     gen_tokens = output[:, encoded["input_ids"].shape[-1] :]
-    return tokenizer.decode(gen_tokens[0], skip_special_tokens=True).strip()
+    response = tokenizer.decode(gen_tokens[0], skip_special_tokens=True).strip()
+    logger.info(f"Generated response (len={len(response)}): {response[:200]}{'...' if len(response) > 200 else ''}")
+    return response
 
 
 def compute_bleu_score(hypothesis: str, reference: str) -> float:
@@ -79,12 +84,22 @@ def compute_bleu_score(hypothesis: str, reference: str) -> float:
     return result.score
 
 
+# Cache the ROUGE evaluator to avoid reloading
+_rouge_evaluator = None
+
+
 def compute_rouge_l_score(hypothesis: str, reference: str) -> float:
     """Compute ROUGE-L F1 score for a single hypothesis against a reference.
     
     ROUGE-L uses longest common subsequence, which is better for semantically
     similar but lexically different answers compared to n-gram based BLEU.
     """
-    rouge = evaluate.load("rouge")
-    result = rouge.compute(predictions=[hypothesis], references=[reference])
-    return result["rougeL"] * 100  # Scale to 0-100 like BLEU
+    global _rouge_evaluator
+    if _rouge_evaluator is None:
+        logger.info("Loading ROUGE evaluator...")
+        _rouge_evaluator = evaluate.load("rouge")
+        logger.info("ROUGE evaluator loaded")
+    result = _rouge_evaluator.compute(predictions=[hypothesis], references=[reference])
+    score = result["rougeL"] * 100  # Scale to 0-100 like BLEU
+    logger.debug(f"ROUGE-L score: {score:.2f} for hypothesis len={len(hypothesis)}, reference len={len(reference)}")
+    return score

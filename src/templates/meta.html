@@ -31,7 +31,7 @@
 </div>
 
 <!-- Actions Row -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     <!-- Generate Synthetic -->
     <div class="section-card">
         <div class="section-header">
@@ -75,6 +75,20 @@
             <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Remove all synthetic features from storage. Keep only real experiment data.</p>
             <form action="/meta/clear-synthetic" method="post" onsubmit="return confirm('Remove all synthetic features?')">
                 <button type="submit" class="btn-danger">Clear Synthetic</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Backfill ROUGE -->
+    <div class="section-card">
+        <div class="section-header">
+            <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            <h3 class="section-title">Backfill ROUGE-L</h3>
+        </div>
+        <div class="section-body">
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Populate missing ROUGE-L scores from existing benchmark evaluations.</p>
+            <form action="/meta/backfill-rouge" method="post">
+                <button type="submit" class="btn-primary">Backfill Scores</button>
             </form>
         </div>
     </div>
@@ -136,45 +150,208 @@
     </div>
     <div class="section-body">
         {% if meta_features %}
+        <!-- Filters -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+            <div>
+                <label class="form-label text-xs">Type</label>
+                <select id="filter-type" class="form-select text-sm w-full" onchange="applyMetaFilters()">
+                    <option value="">All</option>
+                    <option value="synthetic">Synthetic</option>
+                    <option value="real">Real</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label text-xs">Learning Rate</label>
+                <select id="filter-lr" class="form-select text-sm w-full" onchange="applyMetaFilters()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label text-xs">LoRA r</label>
+                <select id="filter-lora" class="form-select text-sm w-full" onchange="applyMetaFilters()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label text-xs">Model</label>
+                <select id="filter-model" class="form-select text-sm w-full" onchange="applyMetaFilters()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label text-xs">Batch Size</label>
+                <select id="filter-batch" class="form-select text-sm w-full" onchange="applyMetaFilters()">
+                    <option value="">All</option>
+                </select>
+            </div>
+        </div>
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table id="meta-features-table" class="w-full text-sm">
                 <thead>
                     <tr class="bg-gray-50 dark:bg-gray-700">
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Experiment ID</th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400">Type</th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400">LR</th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400">LoRA r</th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400">Final Loss</th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400">BLEU</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" onclick="sortMetaTable(0, 'string')">
+                            <div class="flex items-center gap-1">Experiment ID <span class="sort-icon">↕</span></div>
+                        </th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" onclick="sortMetaTable(1, 'string')">
+                            <div class="flex items-center justify-center gap-1">Type <span class="sort-icon">↕</span></div>
+                        </th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" onclick="sortMetaTable(2, 'number')">
+                            <div class="flex items-center justify-center gap-1">LR <span class="sort-icon">↕</span></div>
+                        </th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" onclick="sortMetaTable(3, 'number')">
+                            <div class="flex items-center justify-center gap-1">LoRA r <span class="sort-icon">↕</span></div>
+                        </th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" onclick="sortMetaTable(4, 'number')">
+                            <div class="flex items-center justify-center gap-1">Final Loss <span class="sort-icon">↕</span></div>
+                        </th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" onclick="sortMetaTable(5, 'number')">
+                            <div class="flex items-center justify-center gap-1">ROUGE-L <span class="sort-icon">↕</span></div>
+                        </th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                    {% for f in meta_features[:20] %}
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td class="px-3 py-2 font-mono">{{ f.experiment_id[:16] }}...</td>
-                        <td class="px-3 py-2 text-center">
+                    {% for f in meta_features %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 meta-row"
+                        data-type="{{ 'synthetic' if f.is_synthetic else 'real' }}"
+                        data-lr="{{ f.learning_rate or '' }}"
+                        data-lora="{{ f.lora_r or '' }}"
+                        data-model="{{ f.model_name or '' }}"
+                        data-batch="{{ f.batch_size or '' }}">
+                        <td class="px-3 py-2 font-mono" data-value="{{ f.experiment_id }}">{{ f.experiment_id[:16] }}...</td>
+                        <td class="px-3 py-2 text-center" data-value="{{ 'synthetic' if f.is_synthetic else 'real' }}">
                             {% if f.is_synthetic %}
                             <span class="badge badge-purple">synthetic</span>
                             {% else %}
                             <span class="badge badge-blue">real</span>
                             {% endif %}
                         </td>
-                        <td class="px-3 py-2 text-center font-mono">{{ "%.0e"|format(f.learning_rate) if f.learning_rate else '-' }}</td>
-                        <td class="px-3 py-2 text-center">{{ f.lora_r or '-' }}</td>
-                        <td class="px-3 py-2 text-center font-mono text-amber-600 dark:text-amber-400">{{ "%.4f"|format(f.final_eval_loss) if f.final_eval_loss else '-' }}</td>
-                        <td class="px-3 py-2 text-center font-mono text-emerald-600 dark:text-emerald-400">{{ "%.2f"|format(f.final_bleu_score) if f.final_bleu_score else '-' }}</td>
+                        <td class="px-3 py-2 text-center font-mono" data-value="{{ f.learning_rate or 0 }}">{{ "%.0e"|format(f.learning_rate) if f.learning_rate else '-' }}</td>
+                        <td class="px-3 py-2 text-center" data-value="{{ f.lora_r or 0 }}">{{ f.lora_r or '-' }}</td>
+                        <td class="px-3 py-2 text-center font-mono text-amber-600 dark:text-amber-400" data-value="{{ f.final_eval_loss or 999 }}">{{ "%.4f"|format(f.final_eval_loss) if f.final_eval_loss else '-' }}</td>
+                        <td class="px-3 py-2 text-center font-mono text-emerald-600 dark:text-emerald-400" data-value="{{ f.final_rouge_score if f.final_rouge_score and f.final_rouge_score > 0 else (f.final_bleu_score or -1) }}">
+                            {% if f.final_rouge_score and f.final_rouge_score > 0 %}
+                            {{ "%.2f"|format(f.final_rouge_score) }}
+                            {% elif f.final_bleu_score and f.final_bleu_score > 0 %}
+                            <span class="text-blue-500" title="BLEU (no ROUGE available)">{{ "%.2f"|format(f.final_bleu_score) }}*</span>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        {% if meta_features | length > 20 %}
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-4 text-center">Showing 20 of {{ meta_features | length }} features</p>
-        {% endif %}
+        <p id="meta-count" class="text-sm text-gray-500 dark:text-gray-400 mt-4 text-center">Showing {{ meta_features | length }} features</p>
         {% else %}
         <p class="text-gray-500 dark:text-gray-400 text-center py-8">No meta-features stored yet. Generate synthetic data or extract from experiments.</p>
         {% endif %}
     </div>
 </div>
+
+<script>
+// Populate filter dropdowns from table data
+document.addEventListener('DOMContentLoaded', function() {
+    const rows = document.querySelectorAll('.meta-row');
+    const lrValues = new Set();
+    const loraValues = new Set();
+    const modelValues = new Set();
+    const batchValues = new Set();
+    
+    rows.forEach(row => {
+        if (row.dataset.lr) lrValues.add(row.dataset.lr);
+        if (row.dataset.lora) loraValues.add(row.dataset.lora);
+        if (row.dataset.model) modelValues.add(row.dataset.model);
+        if (row.dataset.batch) batchValues.add(row.dataset.batch);
+    });
+    
+    populateSelect('filter-lr', Array.from(lrValues).sort((a, b) => parseFloat(a) - parseFloat(b)), v => parseFloat(v).toExponential(0));
+    populateSelect('filter-lora', Array.from(loraValues).sort((a, b) => parseInt(a) - parseInt(b)));
+    populateSelect('filter-model', Array.from(modelValues).sort(), v => v.split('/').pop());
+    populateSelect('filter-batch', Array.from(batchValues).sort((a, b) => parseInt(a) - parseInt(b)));
+});
+
+function populateSelect(id, values, labelFn) {
+    const select = document.getElementById(id);
+    if (!select) return;
+    values.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = labelFn ? labelFn(v) : v;
+        select.appendChild(opt);
+    });
+}
+
+function applyMetaFilters() {
+    const typeFilter = document.getElementById('filter-type').value;
+    const lrFilter = document.getElementById('filter-lr').value;
+    const loraFilter = document.getElementById('filter-lora').value;
+    const modelFilter = document.getElementById('filter-model').value;
+    const batchFilter = document.getElementById('filter-batch').value;
+    
+    const rows = document.querySelectorAll('.meta-row');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        let match = true;
+        if (typeFilter && row.dataset.type !== typeFilter) match = false;
+        if (lrFilter && row.dataset.lr !== lrFilter) match = false;
+        if (loraFilter && row.dataset.lora !== loraFilter) match = false;
+        if (modelFilter && row.dataset.model !== modelFilter) match = false;
+        if (batchFilter && row.dataset.batch !== batchFilter) match = false;
+        
+        row.style.display = match ? '' : 'none';
+        if (match) visibleCount++;
+    });
+    
+    document.getElementById('meta-count').textContent = `Showing ${visibleCount} of {{ meta_features | length }} features`;
+}
+
+let metaSortColumn = -1;
+let metaSortAsc = true;
+
+function sortMetaTable(colIndex, type) {
+    const table = document.getElementById('meta-features-table');
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    if (metaSortColumn === colIndex) {
+        metaSortAsc = !metaSortAsc;
+    } else {
+        metaSortColumn = colIndex;
+        metaSortAsc = true;
+    }
+    
+    rows.sort((a, b) => {
+        const aCell = a.cells[colIndex];
+        const bCell = b.cells[colIndex];
+        let aVal = aCell.dataset.value || aCell.textContent.trim();
+        let bVal = bCell.dataset.value || bCell.textContent.trim();
+        
+        if (type === 'number') {
+            aVal = parseFloat(aVal) || 0;
+            bVal = parseFloat(bVal) || 0;
+            return metaSortAsc ? aVal - bVal : bVal - aVal;
+        } else {
+            return metaSortAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        }
+    });
+    
+    rows.forEach(row => tbody.appendChild(row));
+    
+    // Update sort icons
+    const headers = table.querySelectorAll('th');
+    headers.forEach((th, i) => {
+        const icon = th.querySelector('.sort-icon');
+        if (icon) {
+            if (i === colIndex) {
+                icon.textContent = metaSortAsc ? '↑' : '↓';
+            } else {
+                icon.textContent = '↕';
+            }
+        }
+    });
+}
+</script>
 {% endblock %}
 

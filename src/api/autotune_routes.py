@@ -1,12 +1,15 @@
 """AutoTune API routes."""
 from __future__ import annotations
 
+import logging
 import uuid
 from pathlib import Path
 from threading import Thread
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException
+
+logger = logging.getLogger(__name__)
 
 from ..models import (
     AutoTuneCandidate,
@@ -133,6 +136,7 @@ def _run_autotune_job(job_id: str, request: AutoTuneRequest) -> None:
     
     try:
         # Phase 1: Probing
+        logger.info(f"AutoTune {job_id}: Starting probing phase")
         job.status = AutoTuneStatus.PROBING
         job.phase_message = "Running probes to predict best configs..."
         save_autotune_job(job)
@@ -154,6 +158,7 @@ def _run_autotune_job(job_id: str, request: AutoTuneRequest) -> None:
         )
         
         top_candidates = candidates[:request.top_k]
+        logger.info(f"AutoTune {job_id}: Probing complete, {len(top_candidates)} candidates selected")
         
         job.candidates = [
             AutoTuneCandidate(
@@ -169,6 +174,7 @@ def _run_autotune_job(job_id: str, request: AutoTuneRequest) -> None:
         save_autotune_job(job)
         
         # Phase 2: Training
+        logger.info(f"AutoTune {job_id}: Starting training phase")
         job.status = AutoTuneStatus.TRAINING
         save_autotune_job(job)
         
@@ -202,11 +208,13 @@ def _run_autotune_job(job_id: str, request: AutoTuneRequest) -> None:
             save_experiment(exp)
             
             run_causal_lm_experiment_sync(experiment_id, request.dataset_id, config_record.id)
+            logger.info(f"AutoTune {job_id}: Training complete for candidate {i+1}/{len(job.candidates)}")
             
             candidate.experiment_id = experiment_id
             save_autotune_job(job)
         
         # Phase 3: Evaluation
+        logger.info(f"AutoTune {job_id}: Starting evaluation phase")
         job.status = AutoTuneStatus.EVALUATING
         save_autotune_job(job)
         
@@ -256,8 +264,10 @@ def _run_autotune_job(job_id: str, request: AutoTuneRequest) -> None:
         job.phase_message = f"Complete! Best BLEU: {job.candidates[0].actual_bleu:.2f}" if job.candidates and job.candidates[0].actual_bleu else "Complete!"
         job.completed_at = now()
         save_autotune_job(job)
+        logger.info(f"AutoTune {job_id}: Completed successfully")
         
     except Exception as e:
+        logger.exception(f"AutoTune {job_id}: Failed with error: {e}")
         job.status = AutoTuneStatus.FAILED
         job.error = str(e)
         job.completed_at = now()

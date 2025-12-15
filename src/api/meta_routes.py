@@ -127,7 +127,7 @@ def generate_synthetic_data(request: MetaSyntheticRequest) -> MetaSyntheticRespo
     )
 
 
-@router.delete("/synthetic")
+@router.post("/clear-synthetic")
 def clear_synthetic_data() -> dict:
     """Remove all synthetic meta-features from storage."""
     all_features = list_meta_features()
@@ -137,6 +137,52 @@ def clear_synthetic_data() -> dict:
             delete_meta_features(f.experiment_id)
             removed += 1
     return {"removed": removed, "message": f"Removed {removed} synthetic features"}
+
+
+@router.post("/backfill-rouge")
+def backfill_rouge_scores() -> dict:
+    """Backfill ROUGE-L scores for existing meta features from benchmark evals."""
+    all_features = list_meta_features()
+    evals = list_benchmark_evals()
+    updated = 0
+    skipped_synthetic = 0
+    skipped_has_rouge = 0
+    no_evals_found = 0
+    
+    # Build set of experiment IDs with completed evals
+    eval_exp_ids = {e.experiment_id for e in evals if e.status == BenchmarkStatus.COMPLETED}
+    
+    for f in all_features:
+        if f.is_synthetic:
+            skipped_synthetic += 1
+            continue
+        # Skip if already has a real ROUGE score (> 0)
+        if f.final_rouge_score is not None and f.final_rouge_score > 0:
+            skipped_has_rouge += 1
+            continue
+        
+        exp_evals = [e for e in evals if e.experiment_id == f.experiment_id and e.status == BenchmarkStatus.COMPLETED]
+        if exp_evals:
+            rouge = sum(e.rouge_score for e in exp_evals) / len(exp_evals)
+            if rouge > 0:  # Only update if we have real ROUGE data
+                f.final_rouge_score = rouge
+                save_meta_features(f)
+                updated += 1
+            else:
+                no_evals_found += 1
+        else:
+            no_evals_found += 1
+    
+    return {
+        "updated": updated,
+        "skipped_synthetic": skipped_synthetic,
+        "skipped_has_rouge": skipped_has_rouge,
+        "no_evals_found": no_evals_found,
+        "total_features": len(all_features),
+        "total_evals": len(evals),
+        "unique_eval_exp_ids": len(eval_exp_ids),
+        "message": f"Backfilled ROUGE-L for {updated} meta features",
+    }
 
 
 @router.post("/extract/{experiment_id}", response_model=MetaFeatureVector)
@@ -153,8 +199,9 @@ def extract_meta_features(experiment_id: str) -> MetaFeatureVector:
         raise HTTPException(status_code=404, detail="Dataset not found")
 
     evals = list_benchmark_evals()
-    bleu_scores = [e.bleu_score for e in evals if e.experiment_id == experiment_id and e.status == BenchmarkStatus.COMPLETED]
-    final_bleu = sum(bleu_scores) / len(bleu_scores) if bleu_scores else None
+    exp_evals = [e for e in evals if e.experiment_id == experiment_id and e.status == BenchmarkStatus.COMPLETED]
+    final_bleu = sum(e.bleu_score for e in exp_evals) / len(exp_evals) if exp_evals else None
+    final_rouge = sum(e.rouge_score for e in exp_evals) / len(exp_evals) if exp_evals else None
 
     features = run_probe(
         config=exp.config,
@@ -165,6 +212,7 @@ def extract_meta_features(experiment_id: str) -> MetaFeatureVector:
 
     features.final_eval_loss = exp.metrics.get("eval_loss")
     features.final_bleu_score = final_bleu
+    features.final_rouge_score = final_rouge
 
     save_meta_features(features)
     return features
@@ -206,6 +254,16 @@ def get_meta_features_by_id(experiment_id: str) -> MetaFeatureVector:
     if not features:
         raise HTTPException(status_code=404, detail="Meta-features not found")
     return features
+
+
+@router.get("/predictor/status")
+def get_predictor_status() -> dict:
+    """Get the current status of the performance predictor."""
+    predictor = _get_predictor()
+    return {
+        "trained": predictor.model is not None,
+        "target": predictor.target_name if predictor.model else None,
+    }
 
 
 @router.post("/train-predictor", response_model=MetaTrainResponse)

@@ -86,15 +86,16 @@ class MetaFeatureVector(BaseModel):
     # Target metrics (filled after full training)
     final_eval_loss: float | None = None
     final_bleu_score: float | None = None
+    final_rouge_score: float | None = None
 
     def feature_names(self) -> list[str]:
         """Return names of features used for prediction (excludes id and targets)."""
-        exclude = {"experiment_id", "is_synthetic", "final_eval_loss", "final_bleu_score"}
+        exclude = {"experiment_id", "is_synthetic", "final_eval_loss", "final_bleu_score", "final_rouge_score"}
         return [k for k in self.model_fields if k not in exclude]
 
     def to_feature_dict(self) -> dict[str, float | int | bool]:
         """Return feature values as a dict for prediction."""
-        exclude = {"experiment_id", "is_synthetic", "final_eval_loss", "final_bleu_score", "model_name"}
+        exclude = {"experiment_id", "is_synthetic", "final_eval_loss", "final_bleu_score", "final_rouge_score", "model_name"}
         data = self.model_dump()
         result = {}
         for k, v in data.items():

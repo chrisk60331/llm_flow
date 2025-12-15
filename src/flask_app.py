@@ -671,7 +671,7 @@ def meta_probe_submit():
 @app.route("/meta/train", methods=["POST"])
 def meta_train():
     include_synthetic = "include_synthetic" in request.form
-    requests.post(f"{API_BASE_URL}/meta/train", json={"include_synthetic": include_synthetic}, timeout=60)
+    requests.post(f"{API_BASE_URL}/meta/train-predictor", json={"include_synthetic": include_synthetic}, timeout=60)
     return redirect(url_for("meta_page"))
 
 
@@ -685,6 +685,12 @@ def meta_generate_synthetic():
 @app.route("/meta/clear-synthetic", methods=["POST"])
 def meta_clear_synthetic():
     requests.post(f"{API_BASE_URL}/meta/clear-synthetic", timeout=10)
+    return redirect(url_for("meta_page"))
+
+
+@app.route("/meta/backfill-rouge", methods=["POST"])
+def meta_backfill_rouge():
+    requests.post(f"{API_BASE_URL}/meta/backfill-rouge", timeout=30)
     return redirect(url_for("meta_page"))
 
 

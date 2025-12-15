@@ -292,6 +292,24 @@
                 30vw 39vh 2px 1px rgba(224,231,255,1);
         }
 
+        /* Layer 4: Distant bright stars - very slow drift */
+        .stars-4 {
+            animation: twinkle4 6s ease-in-out infinite, celestialDrift4 480s linear infinite;
+            box-shadow:
+                8vw 12vh 3px 2px rgba(255,255,255,1),
+                25vw 45vh 3px 2px rgba(224,231,255,1),
+                47vw 22vh 3px 2px rgba(255,255,255,1),
+                68vw 67vh 3px 2px rgba(199,210,254,1),
+                85vw 33vh 3px 2px rgba(255,255,255,1),
+                15vw 78vh 3px 2px rgba(224,231,255,1),
+                42vw 55vh 3px 2px rgba(255,255,255,1),
+                73vw 15vh 3px 2px rgba(199,210,254,1),
+                92vw 72vh 3px 2px rgba(255,255,255,1),
+                33vw 8vh 3px 2px rgba(224,231,255,1),
+                58vw 88vh 3px 2px rgba(255,255,255,1),
+                4vw 42vh 3px 2px rgba(199,210,254,1);
+        }
+
         @keyframes twinkle1 {
             0%, 100% { opacity: 0.4; }
             50% { opacity: 1; }
@@ -309,6 +327,11 @@
             66% { opacity: 0.7; }
         }
 
+        @keyframes twinkle4 {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+
         /* Slow celestial drift - mimics Earth's rotation */
         @keyframes celestialDrift1 {
             0% { transform: translate(0, 0); }
@@ -323,6 +346,80 @@
         @keyframes celestialDrift3 {
             0% { transform: translate(0, 0); }
             100% { transform: translate(-25vw, 12vh); }
+        }
+
+        @keyframes celestialDrift4 {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-8vw, 4vh); }
+        }
+
+        /* ===== ROCKET (Dark Mode) ===== */
+        .rocket {
+            position: absolute;
+            width: 8px;
+            height: 16px;
+            background: linear-gradient(to top, #d1d5db 0%, #f3f4f6 50%, #e5e7eb 100%);
+            clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+            opacity: 0;
+            will-change: transform, opacity;
+            /* CSS variables set by JS for randomization */
+            left: var(--start-x, 10vw);
+            bottom: var(--start-y, -20px);
+            animation: rocketFly var(--duration, 4s) ease-out forwards;
+        }
+
+        .rocket::before {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 12px;
+            height: 24px;
+            background: radial-gradient(ellipse at top,
+                rgba(251,191,36,1) 0%,
+                rgba(249,115,22,0.9) 30%,
+                rgba(239,68,68,0.6) 60%,
+                transparent 100%);
+            filter: blur(2px);
+            animation: flicker 0.15s ease-in-out infinite alternate;
+        }
+
+        .rocket::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 60px;
+            background: linear-gradient(to bottom,
+                rgba(255,255,255,0.8) 0%,
+                rgba(200,200,200,0.4) 30%,
+                transparent 100%);
+            filter: blur(1px);
+        }
+
+        @keyframes rocketFly {
+            0% { 
+                transform: translate(0, 0) rotate(var(--angle, 35deg));
+                opacity: 0;
+            }
+            5% {
+                opacity: 1;
+            }
+            95% {
+                opacity: 1;
+            }
+            100% {
+                transform: translate(var(--end-x, 80vw), var(--end-y, -120vh)) rotate(var(--angle, 35deg));
+                opacity: 0;
+            }
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.8; height: 20px; }
+            100% { opacity: 1; height: 28px; }
         }
 
         /* ===== CLOUDS (Light Mode) ===== */
@@ -511,6 +608,7 @@
     <div id="bg-effects">
         <!-- Stars (Dark Mode) -->
         <div class="stars-container">
+            <div class="stars-layer stars-4"></div>
             <div class="stars-layer stars-1"></div>
             <div class="stars-layer stars-2"></div>
             <div class="stars-layer stars-3"></div>
@@ -569,6 +667,62 @@
             } catch (e) {}
         });
     });
+    </script>
+    <script>
+    // Rocket spawner - launches rockets with random trajectories in dark mode
+    (function() {
+        const starsContainer = document.querySelector('.stars-container');
+        if (!starsContainer) return;
+
+        function spawnRocket() {
+            // Only spawn if in dark mode
+            if (!window.matchMedia('(prefers-color-scheme: dark)').matches) return;
+
+            const rocket = document.createElement('div');
+            rocket.className = 'rocket';
+
+            // Random start position along bottom or left edge
+            const startFromBottom = Math.random() > 0.3;
+            const startX = startFromBottom ? Math.random() * 60 : -2;
+            const startY = startFromBottom ? -20 : -(Math.random() * 40 + 20);
+
+            // Random trajectory angle (25-55 degrees)
+            const angle = Math.random() * 30 + 25;
+
+            // Calculate end position based on angle
+            const distance = 130;
+            const endX = Math.cos((90 - angle) * Math.PI / 180) * distance;
+            const endY = -Math.sin((90 - angle) * Math.PI / 180) * distance;
+
+            // Random duration (3-5 seconds)
+            const duration = Math.random() * 2 + 3;
+
+            rocket.style.setProperty('--start-x', `${startX}vw`);
+            rocket.style.setProperty('--start-y', `${startY}px`);
+            rocket.style.setProperty('--end-x', `${endX}vw`);
+            rocket.style.setProperty('--end-y', `${endY}vh`);
+            rocket.style.setProperty('--angle', `${angle}deg`);
+            rocket.style.setProperty('--duration', `${duration}s`);
+
+            starsContainer.appendChild(rocket);
+
+            // Remove after animation completes
+            setTimeout(() => rocket.remove(), duration * 1000 + 100);
+        }
+
+        // Spawn rockets at random intervals (30-90 seconds)
+        function scheduleNextRocket() {
+            const delay = Math.random() * 60000 + 30000;
+            setTimeout(() => {
+                spawnRocket();
+                scheduleNextRocket();
+            }, delay);
+        }
+
+        // Initial rocket after 10 seconds, then random intervals
+        setTimeout(spawnRocket, 10000);
+        scheduleNextRocket();
+    })();
     </script>
     {% block scripts %}{% endblock %}
 </body>
