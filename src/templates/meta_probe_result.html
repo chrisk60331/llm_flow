@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Probe Results{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Probe Results</h1>
+        <p class="text-gray-600 dark:text-gray-400">Meta-features extracted and performance predicted</p>
+    </div>
+    
+    <!-- Prediction -->
+    {% if prediction is not none %}
+    <div class="metric-card mb-6 text-center py-8">
+        <p class="metric-label mb-2">Predicted BLEU Score</p>
+        <p class="text-5xl font-bold {% if prediction > 50 %}text-emerald-600{% elif prediction > 20 %}text-amber-600{% else %}text-gray-600{% endif %}">{{ "%.2f"|format(prediction) }}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Based on meta-learning predictor</p>
+    </div>
+    {% else %}
+    <div class="card mb-6">
+        <div class="card-body text-center py-8">
+            <p class="text-gray-500 dark:text-gray-400">No prediction available. Train the meta-predictor first.</p>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Extracted Features -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="font-semibold text-gray-800 dark:text-gray-200">Extracted Meta-Features</h2>
+        </div>
+        <div class="card-body">
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {% for key, value in features.items() %}
+                <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">{{ key.replace('_', ' ') }}</p>
+                    <p class="font-mono text-sm text-gray-900 dark:text-gray-100">
+                        {% if value is number %}
+                            {% if value < 0.01 and value > 0 %}{{ "%.2e"|format(value) }}{% else %}{{ "%.4f"|format(value) }}{% endif %}
+                        {% else %}
+                            {{ value }}
+                        {% endif %}
+                    </p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="flex justify-end mt-6">
+        <a href="/meta" class="btn-primary">Back to Meta Dashboard</a>
+    </div>
+</div>
+{% endblock %}
+

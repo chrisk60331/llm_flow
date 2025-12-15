@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block title %}Evaluate Benchmark{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Evaluate Benchmark</h1>
+        <p class="text-gray-600 dark:text-gray-400">{{ benchmark.name }}: {{ benchmark.question | truncate(80) }}</p>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2 class="font-semibold text-gray-800 dark:text-gray-200">Select Model to Evaluate</h2>
+        </div>
+        <div class="card-body">
+            <div class="form-group mb-6">
+                <label class="form-label">Experiment</label>
+                <select id="experiment-select" class="form-select" required>
+                    <option value="">Select a completed experiment...</option>
+                    {% for exp in experiments %}
+                    <option value="{{ exp.id }}">{{ exp.config.model.pretrained_model_name | truncate(40) }} ({{ exp.id[:8] }}...)</option>
+                    {% endfor %}
+                </select>
+                {% if not experiments %}
+                <p class="text-sm text-amber-600 mt-2">No completed Causal LM experiments available. Train a model first.</p>
+                {% endif %}
+            </div>
+            
+            <div class="section-card mb-6">
+                <div class="section-header">
+                    <h3 class="section-title">Benchmark Details</h3>
+                </div>
+                <div class="section-body space-y-3">
+                    <div>
+                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Question</p>
+                        <p class="text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 p-3 rounded">{{ benchmark.question }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-emerald-600 uppercase mb-1">Gold Answer</p>
+                        <p class="text-sm text-gray-900 dark:text-gray-100 bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded border border-emerald-200 dark:border-emerald-800">{{ benchmark.gold_answer }}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section-card mb-6">
+                <div class="section-header">
+                    <h3 class="section-title">Inference Settings</h3>
+                </div>
+                <div class="section-body">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">These settings will be used when generating responses.</p>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                            <p class="text-xs text-gray-500 dark:text-gray-400 uppercase mb-1">Max Tokens</p>
+                            <p class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ benchmark.max_new_tokens }}</p>
+                        </div>
+                        <div class="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                            <p class="text-xs text-gray-500 dark:text-gray-400 uppercase mb-1">Temperature</p>
+                            <p class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ benchmark.temperature }}</p>
+                        </div>
+                        <div class="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                            <p class="text-xs text-gray-500 dark:text-gray-400 uppercase mb-1">Top-P</p>
+                            <p class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ benchmark.top_p }}</p>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-3 text-center">
+                        <a href="/benchmarks/{{ benchmark.id }}/edit" class="text-primary-600 hover:text-primary-800">Edit settings</a> if you need different inference parameters.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="flex justify-end gap-3">
+                <a href="/benchmarks" class="px-4 py-2 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">Cancel</a>
+                <button type="button" onclick="startEvaluation()" class="btn-primary" id="start-eval-btn" {% if not experiments %}disabled{% endif %}>Start Evaluation</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Evaluation Progress Modal -->
+<div id="eval-modal" class="fixed inset-0 bg-gray-900/60 dark:bg-gray-900/80 backdrop-blur-sm hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg mx-4 border border-gray-200 dark:border-gray-700">
+        <div class="p-6">
+            <div class="text-center mb-6">
+                <div id="eval-icon-container" class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center">
+                    <svg id="eval-icon" class="w-8 h-8 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </div>
+                <h3 id="eval-title" class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">Evaluating Model...</h3>
+                <p id="eval-message" class="text-gray-600 dark:text-gray-400">Running inference and computing scores</p>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="mb-6">
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                    <div id="eval-progress-bar" class="bg-gradient-to-r from-amber-500 to-orange-600 h-3 rounded-full transition-all duration-500 animate-pulse" style="width: 30%"></div>
+                </div>
+                <p class="text-sm text-gray-500 dark:text-gray-400 text-center mt-2" id="eval-status">Status: Starting...</p>
+            </div>
+            
+            <!-- Result Display (hidden until complete) -->
+            <div id="eval-result" class="hidden">
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="metric-card text-center">
+                        <p class="metric-label mb-1">BLEU Score</p>
+                        <p id="eval-bleu" class="text-2xl font-bold text-blue-600">--</p>
+                    </div>
+                    <div class="metric-card text-center">
+                        <p class="metric-label mb-1">ROUGE-L Score</p>
+                        <p id="eval-rouge" class="text-2xl font-bold text-emerald-600">--</p>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Model Answer</p>
+                        <p id="eval-answer" class="text-sm text-gray-900 dark:text-gray-100 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800 max-h-32 overflow-y-auto"></p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Error Display -->
+            <div id="eval-error" class="hidden mt-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+                <p class="text-sm text-red-700 dark:text-red-300" id="eval-error-msg"></p>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button id="eval-close-btn" onclick="closeModal()" class="hidden px-4 py-2 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">Close</button>
+                <a id="eval-view-btn" href="#" class="hidden btn-primary">View Details</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const benchmarkId = "{{ benchmark.id }}";
+    let evalPollingInterval = null;
+    let currentEvalId = null;
+    
+    function openModal() {
+        document.getElementById('eval-modal').classList.remove('hidden');
+        document.getElementById('eval-modal').classList.add('flex');
+    }
+    
+    function closeModal() {
+        if (evalPollingInterval) {
+            clearInterval(evalPollingInterval);
+            evalPollingInterval = null;
+        }
+        document.getElementById('eval-modal').classList.add('hidden');
+        document.getElementById('eval-modal').classList.remove('flex');
+    }
+    
+    async function startEvaluation() {
+        const experimentId = document.getElementById('experiment-select').value;
+        
+        if (!experimentId) {
+            alert('Please select an experiment');
+            return;
+        }
+        
+        // Reset and show modal
+        document.getElementById('eval-result').classList.add('hidden');
+        document.getElementById('eval-error').classList.add('hidden');
+        document.getElementById('eval-close-btn').classList.add('hidden');
+        document.getElementById('eval-view-btn').classList.add('hidden');
+        document.getElementById('eval-progress-bar').style.width = '30%';
+        document.getElementById('eval-progress-bar').classList.add('animate-pulse');
+        document.getElementById('eval-progress-bar').classList.remove('from-emerald-500', 'to-green-600', 'from-red-500', 'to-red-600');
+        document.getElementById('eval-progress-bar').classList.add('from-amber-500', 'to-orange-600');
+        document.getElementById('eval-icon-container').classList.remove('from-emerald-500', 'to-green-600', 'from-red-500', 'to-red-600');
+        document.getElementById('eval-icon-container').classList.add('from-amber-500', 'to-orange-600');
+        document.getElementById('eval-icon').classList.add('animate-pulse');
+        document.getElementById('eval-icon').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>';
+        document.getElementById('eval-title').textContent = 'Evaluating Model...';
+        document.getElementById('eval-message').textContent = 'Running inference and computing scores';
+        document.getElementById('eval-status').textContent = 'Status: Starting...';
+        
+        openModal();
+        
+        try {
+            // Start the evaluation via API
+            const resp = await fetch('/api/proxy/benchmarks/' + benchmarkId + '/evaluate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ experiment_id: experimentId })
+            });
+            
+            if (!resp.ok) {
+                const errorData = await resp.json();
+                throw new Error(errorData.detail || 'Failed to start evaluation');
+            }
+            
+            const data = await resp.json();
+            currentEvalId = data.eval_id;
+            
+            document.getElementById('eval-progress-bar').style.width = '50%';
+            document.getElementById('eval-status').textContent = 'Status: Running';
+            
+            // Start polling for completion
+            evalPollingInterval = setInterval(pollEvalStatus, 2000);
+            
+        } catch (error) {
+            showError(error.message);
+        }
+    }
+    
+    async function pollEvalStatus() {
+        if (!currentEvalId) return;
+        
+        try {
+            const resp = await fetch('/api/evaluations/' + currentEvalId);
+            const data = await resp.json();
+            
+            if (data.status === 'completed') {
+                clearInterval(evalPollingInterval);
+                evalPollingInterval = null;
+                showComplete(data);
+            } else if (data.status === 'failed') {
+                clearInterval(evalPollingInterval);
+                evalPollingInterval = null;
+                showError(data.error || 'Evaluation failed');
+            } else {
+                // Still running
+                document.getElementById('eval-progress-bar').style.width = '70%';
+                document.getElementById('eval-status').textContent = 'Status: ' + data.status;
+            }
+        } catch (error) {
+            console.error('Poll error:', error);
+        }
+    }
+    
+    function showComplete(data) {
+        document.getElementById('eval-progress-bar').style.width = '100%';
+        document.getElementById('eval-progress-bar').classList.remove('animate-pulse', 'from-amber-500', 'to-orange-600');
+        document.getElementById('eval-progress-bar').classList.add('from-emerald-500', 'to-green-600');
+        
+        document.getElementById('eval-icon-container').classList.remove('from-amber-500', 'to-orange-600');
+        document.getElementById('eval-icon-container').classList.add('from-emerald-500', 'to-green-600');
+        document.getElementById('eval-icon').classList.remove('animate-pulse');
+        document.getElementById('eval-icon').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>';
+        
+        document.getElementById('eval-title').textContent = 'Evaluation Complete!';
+        document.getElementById('eval-message').textContent = 'Model evaluation finished successfully';
+        document.getElementById('eval-status').textContent = 'Status: Completed';
+        
+        // Show results
+        document.getElementById('eval-bleu').textContent = data.bleu_score.toFixed(2);
+        document.getElementById('eval-rouge').textContent = data.rouge_score.toFixed(2);
+        document.getElementById('eval-answer').textContent = data.model_answer || 'No answer generated';
+        
+        // Color the ROUGE score
+        const rougeEl = document.getElementById('eval-rouge');
+        rougeEl.classList.remove('text-emerald-600', 'text-amber-600', 'text-red-600');
+        if (data.rouge_score > 50) {
+            rougeEl.classList.add('text-emerald-600');
+        } else if (data.rouge_score > 20) {
+            rougeEl.classList.add('text-amber-600');
+        } else {
+            rougeEl.classList.add('text-red-600');
+        }
+        
+        document.getElementById('eval-result').classList.remove('hidden');
+        document.getElementById('eval-close-btn').classList.remove('hidden');
+        document.getElementById('eval-view-btn').classList.remove('hidden');
+        document.getElementById('eval-view-btn').href = '/evaluations/' + currentEvalId;
+    }
+    
+    function showError(message) {
+        document.getElementById('eval-progress-bar').classList.remove('animate-pulse', 'from-amber-500', 'to-orange-600');
+        document.getElementById('eval-progress-bar').classList.add('from-red-500', 'to-red-600');
+        
+        document.getElementById('eval-icon-container').classList.remove('from-amber-500', 'to-orange-600');
+        document.getElementById('eval-icon-container').classList.add('from-red-500', 'to-red-600');
+        document.getElementById('eval-icon').classList.remove('animate-pulse');
+        document.getElementById('eval-icon').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>';
+        
+        document.getElementById('eval-title').textContent = 'Evaluation Failed';
+        document.getElementById('eval-message').textContent = '';
+        document.getElementById('eval-status').textContent = 'Status: Failed';
+        
+        document.getElementById('eval-error-msg').textContent = message;
+        document.getElementById('eval-error').classList.remove('hidden');
+        document.getElementById('eval-close-btn').classList.remove('hidden');
+    }
+</script>
+{% endblock %}

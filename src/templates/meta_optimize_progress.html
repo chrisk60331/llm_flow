@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Optimization in Progress{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="mb-6 text-center">
+        <div class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
+            <svg class="w-8 h-8 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+        </div>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Optimization in Progress</h1>
+        <p class="text-gray-600 dark:text-gray-400">Finding optimal hyperparameters...</p>
+    </div>
+    
+    <!-- Progress -->
+    <div class="card mb-6">
+        <div class="card-body">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-gray-500 dark:text-gray-400">Status</span>
+                <span class="badge badge-blue">{{ job.status }}</span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                <div class="bg-gradient-to-r from-purple-500 to-indigo-600 h-3 rounded-full transition-all duration-500 animate-pulse" style="width: {{ ((job.completed_trials | default(0)) / (job.total_trials | default(1)) * 100) | int }}%"></div>
+            </div>
+            <div class="flex justify-between text-sm text-gray-500 dark:text-gray-400 mt-2">
+                <span>{{ job.completed_trials | default(0) }} / {{ job.total_trials | default('?') }} trials</span>
+                <span id="elapsed-time">Elapsed: --</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Current Best -->
+    {% if job.best_config %}
+    <div class="card">
+        <div class="card-header">
+            <h2 class="font-semibold text-gray-800 dark:text-gray-200">Current Best</h2>
+        </div>
+        <div class="card-body">
+            <div class="grid grid-cols-2 gap-4">
+                {% for key, value in job.best_config.items() %}
+                <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">{{ key.replace('_', ' ') }}</p>
+                    <p class="font-mono text-sm text-gray-900 dark:text-gray-100">
+                        {% if value is number %}{{ "%.4g"|format(value) }}{% else %}{{ value }}{% endif %}
+                    </p>
+                </div>
+                {% endfor %}
+            </div>
+            {% if job.best_score %}
+            <div class="mt-4 text-center">
+                <span class="text-sm text-gray-500 dark:text-gray-400">Best Score: </span>
+                <span class="font-bold text-lg text-emerald-600">{{ "%.4f"|format(job.best_score) }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const jobId = "{{ job.id }}";
+    
+    async function checkStatus() {
+        const resp = await fetch('/api/optimize/' + jobId + '/status');
+        const data = await resp.json();
+        
+        if (data.status === 'completed' || data.status === 'failed') {
+            window.location.href = '/meta/optimize/' + jobId + '/results';
+        }
+    }
+    
+    setInterval(checkStatus, 3000);
+</script>
+{% endblock %}
+

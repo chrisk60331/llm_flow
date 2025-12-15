@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Benchmark - {{ benchmark.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Edit Benchmark</h1>
+        <p class="text-gray-600 dark:text-gray-400">Update benchmark settings and inference parameters</p>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="font-semibold text-gray-800 dark:text-gray-200">Benchmark Settings</h2>
+        </div>
+        <div class="card-body">
+            <form action="/benchmarks/{{ benchmark.id }}/edit" method="post" class="space-y-4">
+                <div class="form-group">
+                    <label class="form-label">Benchmark Name</label>
+                    <input type="text" name="name" required class="form-input" value="{{ benchmark.name }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Question</label>
+                    <textarea name="question" rows="3" required class="form-textarea">{{ benchmark.question }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Gold Answer</label>
+                    <textarea name="gold_answer" rows="3" required class="form-textarea">{{ benchmark.gold_answer }}</textarea>
+                </div>
+                
+                <div class="section-card">
+                    <div class="section-header">
+                        <h3 class="section-title">Inference Settings</h3>
+                    </div>
+                    <div class="section-body">
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            These settings control how the model generates responses during evaluation.
+                        </p>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Max Response Tokens</label>
+                                <input type="number" name="max_new_tokens" value="{{ benchmark.max_new_tokens }}" min="1" max="4096" class="form-input">
+                                <p class="text-xs text-gray-500 mt-1">Maximum tokens to generate</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Temperature</label>
+                                <input type="number" name="temperature" value="{{ benchmark.temperature }}" min="0.01" max="2.0" step="0.1" class="form-input">
+                                <p class="text-xs text-gray-500 mt-1">Sampling temperature (0.1-2.0)</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Top-P</label>
+                                <input type="number" name="top_p" value="{{ benchmark.top_p }}" min="0.01" max="1.0" step="0.05" class="form-input">
+                                <p class="text-xs text-gray-500 mt-1">Nucleus sampling (0.1-1.0)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end gap-3 pt-4">
+                    <a href="/benchmarks" class="px-4 py-2 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">Cancel</a>
+                    <button type="submit" class="btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

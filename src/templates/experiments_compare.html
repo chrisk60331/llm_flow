@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Compare Experiments{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Experiment Comparison</h1>
+    <p class="text-gray-600 dark:text-gray-400">Compare configs and metrics across experiments</p>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="font-semibold text-gray-800 dark:text-gray-200">Comparison Results</h2>
+    </div>
+    <div class="card-body">
+        {% if comparison.experiments %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="bg-gray-50 dark:bg-gray-700">
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Experiment</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Model</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">LR</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Epochs</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Batch</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Eval Loss</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    {% for exp in comparison.experiments %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td class="px-4 py-2 font-mono">
+                            <a href="/experiments/{{ exp.id }}" class="text-primary-600 hover:underline">{{ exp.id[:8] }}...</a>
+                        </td>
+                        <td class="px-4 py-2 font-mono text-xs">{{ exp.config.model.pretrained_model_name | truncate(25) }}</td>
+                        <td class="px-4 py-2 font-mono text-xs">{{ "%.0e"|format(exp.config.training.learning_rate) }}</td>
+                        <td class="px-4 py-2">{{ exp.config.training.num_train_epochs }}</td>
+                        <td class="px-4 py-2">{{ exp.config.training.per_device_train_batch_size }}</td>
+                        <td class="px-4 py-2 font-mono">{{ "%.4f"|format(exp.metrics.eval_loss) if exp.metrics and exp.metrics.eval_loss else '-' }}</td>
+                        <td class="px-4 py-2">
+                            {% if exp.status == 'completed' %}
+                            <span class="badge badge-green">completed</span>
+                            {% elif exp.status == 'running' %}
+                            <span class="badge badge-blue">running</span>
+                            {% else %}
+                            <span class="badge badge-gray">{{ exp.status }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if comparison.config_diff %}
+        <div class="mt-6">
+            <h3 class="font-semibold text-gray-800 dark:text-gray-200 mb-3">Config Differences</h3>
+            <pre class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">{{ comparison.config_diff | tojson(indent=2) }}</pre>
+        </div>
+        {% endif %}
+        {% else %}
+        <p class="text-gray-500 dark:text-gray-400 text-center py-8">No experiments to compare</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

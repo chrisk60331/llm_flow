@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AIP-C01 Prep{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'media',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {"50":"#eef2ff","100":"#e0e7ff","200":"#c7d2fe","300":"#a5b4fc","400":"#818cf8","500":"#6366f1","600":"#4f46e5","700":"#4338ca","800":"#3730a3","900":"#312e81"}
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer components {
+            .btn-primary {
+                @apply bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-all duration-200 shadow-sm hover:shadow-md;
+            }
+            .btn-success {
+                @apply bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-all duration-200 shadow-sm hover:shadow-md;
+            }
+            .btn-danger {
+                @apply bg-red-500 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-red-600 transition-all duration-200;
+            }
+            .card {
+                @apply bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden;
+            }
+            .card-header {
+                @apply px-6 py-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50;
+            }
+            .card-body {
+                @apply p-6;
+            }
+            .form-group {
+                @apply space-y-1.5;
+            }
+            .form-label {
+                @apply block text-sm font-medium text-gray-700 dark:text-gray-300;
+            }
+            .form-input {
+                @apply w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 bg-white dark:bg-gray-700;
+            }
+            .form-textarea {
+                @apply w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 font-mono focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 bg-white dark:bg-gray-700 resize-none;
+            }
+            .form-select {
+                @apply w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 bg-white dark:bg-gray-700;
+            }
+            .form-checkbox {
+                @apply w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 transition-all duration-200;
+            }
+            .section-card {
+                @apply bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden;
+            }
+            .section-header {
+                @apply px-5 py-3 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2;
+            }
+            .section-title {
+                @apply text-base font-semibold text-gray-800 dark:text-gray-200;
+            }
+            .section-body {
+                @apply p-5;
+            }
+            .badge {
+                @apply px-2.5 py-1 text-xs font-medium rounded-full;
+            }
+            .badge-blue {
+                @apply bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300;
+            }
+            .badge-green {
+                @apply bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300;
+            }
+            .badge-red {
+                @apply bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300;
+            }
+            .badge-gray {
+                @apply bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300;
+            }
+            .badge-amber {
+                @apply bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300;
+            }
+            .badge-purple {
+                @apply bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300;
+            }
+            .metric-card {
+                @apply bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700;
+            }
+            .metric-value {
+                @apply text-2xl font-bold text-primary-600 dark:text-primary-400;
+            }
+            .metric-label {
+                @apply text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide;
+            }
+            .tooltip-trigger {
+                @apply inline-flex items-center justify-center w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help transition-colors;
+            }
+            .tooltip-content {
+                @apply invisible opacity-0 absolute z-50 px-3 py-2 text-xs font-normal text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg whitespace-normal max-w-xs left-1/2 -translate-x-1/2 bottom-full mb-2 transition-all duration-200;
+            }
+            .tooltip-content::after {
+                content: '';
+                @apply absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700;
+            }
+            .group:hover .tooltip-content {
+                @apply visible opacity-100;
+            }
+        }
+    </style>
+    <style>
+        /* ===== ANIMATED BACKGROUND EFFECTS ===== */
+        #bg-effects {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Ensure content stays above background effects */
+        nav, main {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ===== STAR FIELD (Dark Mode) ===== */
+        .stars-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1px;
+            height: 1px;
+            background: transparent;
+            will-change: opacity;
+        }
+
+        .stars-1 {
+            animation: twinkle1 4s ease-in-out infinite, celestialDrift1 240s linear infinite;
+            box-shadow:
+                2vw 3vh 0 0 rgba(255,255,255,0.8),
+                5vw 8vh 0 0 rgba(224,231,255,0.7),
+                8vw 2vh 0 0 rgba(199,210,254,0.9),
+                11vw 15vh 0 0 rgba(255,255,255,0.6),
+                14vw 6vh 0 0 rgba(224,231,255,0.85),
+                17vw 22vh 0 0 rgba(255,255,255,0.75),
+                20vw 11vh 0 0 rgba(199,210,254,0.8),
+                23vw 28vh 0 0 rgba(255,255,255,0.9),
+                26vw 4vh 0 0 rgba(224,231,255,0.65),
+                29vw 18vh 0 0 rgba(255,255,255,0.7),
+                32vw 32vh 0 0 rgba(199,210,254,0.85),
+                35vw 9vh 0 0 rgba(255,255,255,0.8),
+                38vw 25vh 0 0 rgba(224,231,255,0.75),
+                41vw 14vh 0 0 rgba(255,255,255,0.9),
+                44vw 38vh 0 0 rgba(199,210,254,0.6),
+                47vw 7vh 0 0 rgba(255,255,255,0.85),
+                50vw 21vh 0 0 rgba(224,231,255,0.7),
+                53vw 35vh 0 0 rgba(255,255,255,0.8),
+                56vw 12vh 0 0 rgba(199,210,254,0.9),
+                59vw 42vh 0 0 rgba(255,255,255,0.65),
+                62vw 5vh 0 0 rgba(224,231,255,0.8),
+                65vw 28vh 0 0 rgba(255,255,255,0.75),
+                68vw 16vh 0 0 rgba(199,210,254,0.85),
+                71vw 45vh 0 0 rgba(255,255,255,0.7),
+                74vw 10vh 0 0 rgba(224,231,255,0.9),
+                77vw 32vh 0 0 rgba(255,255,255,0.6),
+                80vw 19vh 0 0 rgba(199,210,254,0.8),
+                83vw 48vh 0 0 rgba(255,255,255,0.85),
+                86vw 8vh 0 0 rgba(224,231,255,0.7),
+                89vw 25vh 0 0 rgba(255,255,255,0.9),
+                92vw 52vh 0 0 rgba(199,210,254,0.75),
+                95vw 15vh 0 0 rgba(255,255,255,0.8),
+                98vw 38vh 0 0 rgba(224,231,255,0.65),
+                3vw 55vh 0 0 rgba(255,255,255,0.85),
+                7vw 62vh 0 0 rgba(199,210,254,0.7),
+                12vw 48vh 0 0 rgba(224,231,255,0.9),
+                16vw 58vh 0 0 rgba(255,255,255,0.75),
+                21vw 65vh 0 0 rgba(199,210,254,0.8),
+                25vw 52vh 0 0 rgba(255,255,255,0.6),
+                30vw 72vh 0 0 rgba(224,231,255,0.85),
+                34vw 59vh 0 0 rgba(255,255,255,0.9),
+                39vw 78vh 0 0 rgba(199,210,254,0.7),
+                43vw 66vh 0 0 rgba(255,255,255,0.8),
+                48vw 55vh 0 0 rgba(224,231,255,0.75),
+                52vw 82vh 0 0 rgba(255,255,255,0.65),
+                57vw 69vh 0 0 rgba(199,210,254,0.9),
+                61vw 58vh 0 0 rgba(255,255,255,0.85),
+                66vw 75vh 0 0 rgba(224,231,255,0.7),
+                70vw 62vh 0 0 rgba(255,255,255,0.8),
+                75vw 88vh 0 0 rgba(199,210,254,0.6),
+                79vw 71vh 0 0 rgba(255,255,255,0.9),
+                84vw 64vh 0 0 rgba(224,231,255,0.75),
+                88vw 85vh 0 0 rgba(255,255,255,0.85),
+                93vw 68vh 0 0 rgba(199,210,254,0.7),
+                97vw 92vh 0 0 rgba(255,255,255,0.8),
+                4vw 95vh 0 0 rgba(224,231,255,0.65),
+                9vw 88vh 0 0 rgba(255,255,255,0.9),
+                15vw 81vh 0 0 rgba(199,210,254,0.8),
+                22vw 94vh 0 0 rgba(255,255,255,0.7),
+                28vw 87vh 0 0 rgba(224,231,255,0.85);
+        }
+
+        .stars-2 {
+            animation: twinkle2 3s ease-in-out infinite, celestialDrift2 200s linear infinite;
+            box-shadow:
+                1vw 12vh 1px 0 rgba(255,255,255,0.9),
+                4vw 26vh 1px 0 rgba(224,231,255,0.75),
+                7vw 19vh 1px 0 rgba(199,210,254,0.85),
+                10vw 33vh 1px 0 rgba(255,255,255,0.7),
+                13vw 41vh 1px 0 rgba(224,231,255,0.9),
+                16vw 27vh 1px 0 rgba(255,255,255,0.8),
+                19vw 49vh 1px 0 rgba(199,210,254,0.65),
+                22vw 36vh 1px 0 rgba(255,255,255,0.85),
+                25vw 54vh 1px 0 rgba(224,231,255,0.7),
+                28vw 44vh 1px 0 rgba(255,255,255,0.9),
+                31vw 61vh 1px 0 rgba(199,210,254,0.8),
+                34vw 51vh 1px 0 rgba(255,255,255,0.75),
+                37vw 68vh 1px 0 rgba(224,231,255,0.85),
+                40vw 57vh 1px 0 rgba(255,255,255,0.6),
+                43vw 74vh 1px 0 rgba(199,210,254,0.9),
+                46vw 63vh 1px 0 rgba(255,255,255,0.8),
+                49vw 81vh 1px 0 rgba(224,231,255,0.7),
+                52vw 71vh 1px 0 rgba(255,255,255,0.85),
+                55vw 87vh 1px 0 rgba(199,210,254,0.75),
+                58vw 77vh 1px 0 rgba(255,255,255,0.9),
+                61vw 93vh 1px 0 rgba(224,231,255,0.65),
+                64vw 84vh 1px 0 rgba(255,255,255,0.8),
+                67vw 17vh 1px 0 rgba(199,210,254,0.85),
+                70vw 91vh 1px 0 rgba(255,255,255,0.7),
+                73vw 23vh 1px 0 rgba(224,231,255,0.9),
+                76vw 97vh 1px 0 rgba(255,255,255,0.8),
+                79vw 31vh 1px 0 rgba(199,210,254,0.6),
+                82vw 13vh 1px 0 rgba(255,255,255,0.85),
+                85vw 39vh 1px 0 rgba(224,231,255,0.75),
+                88vw 21vh 1px 0 rgba(255,255,255,0.9),
+                91vw 46vh 1px 0 rgba(199,210,254,0.8),
+                94vw 29vh 1px 0 rgba(255,255,255,0.7),
+                97vw 53vh 1px 0 rgba(224,231,255,0.85),
+                2vw 37vh 1px 0 rgba(255,255,255,0.65),
+                6vw 44vh 1px 0 rgba(199,210,254,0.9),
+                11vw 73vh 1px 0 rgba(255,255,255,0.8),
+                18vw 67vh 1px 0 rgba(224,231,255,0.7),
+                24vw 79vh 1px 0 rgba(255,255,255,0.85),
+                33vw 83vh 1px 0 rgba(199,210,254,0.75),
+                42vw 89vh 1px 0 rgba(255,255,255,0.9),
+                54vw 96vh 1px 0 rgba(224,231,255,0.6),
+                63vw 76vh 1px 0 rgba(255,255,255,0.8),
+                72vw 82vh 1px 0 rgba(199,210,254,0.85),
+                81vw 94vh 1px 0 rgba(255,255,255,0.7),
+                90vw 86vh 1px 0 rgba(224,231,255,0.9);
+        }
+
+        .stars-3 {
+            animation: twinkle3 2.5s ease-in-out infinite, celestialDrift3 160s linear infinite;
+            box-shadow:
+                3vw 17vh 2px 1px rgba(255,255,255,1),
+                9vw 34vh 2px 1px rgba(224,231,255,0.95),
+                15vw 8vh 2px 1px rgba(199,210,254,1),
+                21vw 51vh 2px 1px rgba(255,255,255,0.9),
+                27vw 23vh 2px 1px rgba(224,231,255,1),
+                33vw 67vh 2px 1px rgba(255,255,255,0.95),
+                39vw 42vh 2px 1px rgba(199,210,254,0.9),
+                45vw 79vh 2px 1px rgba(255,255,255,1),
+                51vw 31vh 2px 1px rgba(224,231,255,0.95),
+                57vw 58vh 2px 1px rgba(199,210,254,1),
+                63vw 14vh 2px 1px rgba(255,255,255,0.9),
+                69vw 73vh 2px 1px rgba(224,231,255,1),
+                75vw 46vh 2px 1px rgba(255,255,255,0.95),
+                81vw 89vh 2px 1px rgba(199,210,254,0.9),
+                87vw 27vh 2px 1px rgba(255,255,255,1),
+                93vw 62vh 2px 1px rgba(224,231,255,0.95),
+                6vw 76vh 2px 1px rgba(255,255,255,0.9),
+                18vw 91vh 2px 1px rgba(199,210,254,1),
+                36vw 85vh 2px 1px rgba(224,231,255,0.95),
+                48vw 94vh 2px 1px rgba(255,255,255,1),
+                66vw 88vh 2px 1px rgba(199,210,254,0.9),
+                78vw 96vh 2px 1px rgba(255,255,255,0.95),
+                96vw 83vh 2px 1px rgba(224,231,255,1),
+                12vw 3vh 2px 1px rgba(255,255,255,0.9),
+                42vw 6vh 2px 1px rgba(199,210,254,1),
+                72vw 4vh 2px 1px rgba(224,231,255,0.95),
+                84vw 11vh 2px 1px rgba(255,255,255,1),
+                24vw 19vh 2px 1px rgba(199,210,254,0.9),
+                54vw 16vh 2px 1px rgba(255,255,255,0.95),
+                30vw 39vh 2px 1px rgba(224,231,255,1);
+        }
+
+        @keyframes twinkle1 {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes twinkle2 {
+            0%, 100% { opacity: 0.6; }
+            25% { opacity: 0.3; }
+            75% { opacity: 1; }
+        }
+
+        @keyframes twinkle3 {
+            0%, 100% { opacity: 0.5; }
+            33% { opacity: 1; }
+            66% { opacity: 0.7; }
+        }
+
+        /* Slow celestial drift - mimics Earth's rotation */
+        @keyframes celestialDrift1 {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-15vw, 8vh); }
+        }
+
+        @keyframes celestialDrift2 {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-20vw, 10vh); }
+        }
+
+        @keyframes celestialDrift3 {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-25vw, 12vh); }
+        }
+
+        /* ===== CLOUDS (Light Mode) ===== */
+        .cloud {
+            position: absolute;
+            background: radial-gradient(ellipse at center,
+                rgba(255,255,255,1) 0%,
+                rgba(255,255,255,0.95) 25%,
+                rgba(255,255,255,0.7) 50%,
+                rgba(255,255,255,0.3) 75%,
+                transparent 100%);
+            border-radius: 50%;
+            will-change: transform;
+            filter: blur(4px);
+        }
+
+        .cloud::before,
+        .cloud::after {
+            content: '';
+            position: absolute;
+            background: radial-gradient(ellipse at center,
+                rgba(255,255,255,1) 0%,
+                rgba(255,255,255,0.9) 30%,
+                rgba(255,255,255,0.5) 60%,
+                transparent 85%);
+            border-radius: 50%;
+        }
+
+        .cloud-1 {
+            width: 350px;
+            height: 140px;
+            top: 8%;
+            left: -400px;
+            animation: cloudDrift1 55s linear infinite;
+            opacity: 0.95;
+        }
+
+        .cloud-1::before {
+            width: 180px;
+            height: 110px;
+            top: -50px;
+            left: 70px;
+        }
+
+        .cloud-1::after {
+            width: 200px;
+            height: 100px;
+            top: -35px;
+            left: 160px;
+        }
+
+        .cloud-2 {
+            width: 300px;
+            height: 120px;
+            top: 22%;
+            left: -350px;
+            animation: cloudDrift2 70s linear infinite;
+            animation-delay: -20s;
+            opacity: 0.9;
+        }
+
+        .cloud-2::before {
+            width: 150px;
+            height: 90px;
+            top: -40px;
+            left: 60px;
+        }
+
+        .cloud-2::after {
+            width: 170px;
+            height: 80px;
+            top: -28px;
+            left: 130px;
+        }
+
+        .cloud-3 {
+            width: 450px;
+            height: 170px;
+            top: 45%;
+            left: -500px;
+            animation: cloudDrift3 80s linear infinite;
+            animation-delay: -35s;
+            opacity: 0.85;
+        }
+
+        .cloud-3::before {
+            width: 230px;
+            height: 130px;
+            top: -60px;
+            left: 90px;
+        }
+
+        .cloud-3::after {
+            width: 250px;
+            height: 110px;
+            top: -45px;
+            left: 200px;
+        }
+
+        .cloud-4 {
+            width: 320px;
+            height: 130px;
+            top: 65%;
+            left: -370px;
+            animation: cloudDrift4 65s linear infinite;
+            animation-delay: -10s;
+            opacity: 0.92;
+        }
+
+        .cloud-4::before {
+            width: 160px;
+            height: 100px;
+            top: -45px;
+            left: 65px;
+        }
+
+        .cloud-4::after {
+            width: 180px;
+            height: 90px;
+            top: -32px;
+            left: 140px;
+        }
+
+        .cloud-5 {
+            width: 280px;
+            height: 110px;
+            top: 82%;
+            left: -330px;
+            animation: cloudDrift5 50s linear infinite;
+            animation-delay: -40s;
+            opacity: 0.88;
+        }
+
+        .cloud-5::before {
+            width: 140px;
+            height: 85px;
+            top: -38px;
+            left: 55px;
+        }
+
+        .cloud-5::after {
+            width: 160px;
+            height: 75px;
+            top: -26px;
+            left: 120px;
+        }
+
+        @keyframes cloudDrift1 {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(calc(100vw + 400px)); }
+        }
+
+        @keyframes cloudDrift2 {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(calc(100vw + 350px)); }
+        }
+
+        @keyframes cloudDrift3 {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(calc(100vw + 500px)); }
+        }
+
+        @keyframes cloudDrift4 {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(calc(100vw + 380px)); }
+        }
+
+        @keyframes cloudDrift5 {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(calc(100vw + 320px)); }
+        }
+
+        /* ===== MODE VISIBILITY TOGGLES ===== */
+        .stars-container { display: none; }
+        .clouds-container { display: block; }
+
+        @media (prefers-color-scheme: dark) {
+            .stars-container { display: block; }
+            .clouds-container { display: none; }
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-gradient-to-br from-sky-100 to-sky-200 dark:from-gray-900 dark:to-gray-950 min-h-screen text-gray-900 dark:text-gray-100">
+    <!-- Animated Background Effects -->
+    <div id="bg-effects">
+        <!-- Stars (Dark Mode) -->
+        <div class="stars-container">
+            <div class="stars-layer stars-1"></div>
+            <div class="stars-layer stars-2"></div>
+            <div class="stars-layer stars-3"></div>
+        </div>
+        <!-- Clouds (Light Mode) -->
+        <div class="clouds-container">
+            <div class="cloud cloud-1"></div>
+            <div class="cloud cloud-2"></div>
+            <div class="cloud cloud-3"></div>
+            <div class="cloud cloud-4"></div>
+            <div class="cloud cloud-5"></div>
+        </div>
+    </div>
+
+    <nav class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="/" class="flex items-center gap-2">
+                    <div class="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center">
+                        <span class="text-white font-bold text-sm">AI</span>
+                    </div>
+                    <span class="text-lg font-semibold text-gray-900 dark:text-gray-100">AIP-C01 Prep</span>
+                </a>
+                <div class="flex items-center gap-1">
+                    <a href="/" class="px-4 py-2 text-sm font-medium rounded-lg transition-all {% if request.path == '/' %}bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 ring-1 ring-primary-200 dark:ring-primary-800{% else %}text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">Home</a>
+                    <a href="/datasets" class="px-4 py-2 text-sm font-medium rounded-lg transition-all {% if request.path.startswith('/datasets') %}bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 ring-1 ring-primary-200 dark:ring-primary-800{% else %}text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">Datasets</a>
+                    <a href="/configs" class="px-4 py-2 text-sm font-medium rounded-lg transition-all {% if request.path.startswith('/configs') %}bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 ring-1 ring-primary-200 dark:ring-primary-800{% else %}text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">Configs</a>
+                    <a href="/experiments" class="px-4 py-2 text-sm font-medium rounded-lg transition-all {% if request.path.startswith('/experiments') %}bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 ring-1 ring-primary-200 dark:ring-primary-800{% else %}text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">Experiments</a>
+                    <a href="/benchmarks" class="px-4 py-2 text-sm font-medium rounded-lg transition-all {% if request.path.startswith('/benchmarks') %}bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 ring-1 ring-primary-200 dark:ring-primary-800{% else %}text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">Benchmarks</a>
+                    <a href="/evaluations" class="px-4 py-2 text-sm font-medium rounded-lg transition-all {% if request.path.startswith('/evaluations') %}bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 ring-1 ring-primary-200 dark:ring-primary-800{% else %}text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">Evaluations</a>
+                    <a href="/meta" class="px-4 py-2 text-sm font-medium rounded-lg transition-all {% if request.path.startswith('/meta') %}bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 ring-1 ring-purple-200 dark:ring-purple-800{% else %}text-purple-600 dark:text-purple-400 hover:text-purple-900 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/30{% endif %}">Meta</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}{% endblock %}
+    </main>
+    <script>
+    // Convert UTC timestamps to local timezone
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('[data-utc]').forEach(function(el) {
+            const utc = el.getAttribute('data-utc');
+            if (!utc) return;
+            try {
+                const date = new Date(utc.includes('T') ? utc : utc.replace(' ', 'T') + 'Z');
+                if (isNaN(date.getTime())) return;
+                const format = el.getAttribute('data-format') || 'datetime';
+                if (format === 'date') {
+                    el.textContent = date.toLocaleDateString();
+                } else if (format === 'time') {
+                    el.textContent = date.toLocaleTimeString();
+                } else {
+                    el.textContent = date.toLocaleString();
+                }
+            } catch (e) {}
+        });
+    });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
+

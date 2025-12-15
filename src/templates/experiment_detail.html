@@ -1,0 +1,910 @@
+{% extends "base.html" %}
+
+{% block title %}Experiment Details - AIP-C01 Prep{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+            {% if experiment.experiment_type == 'causal_lm' %}
+            <span class="badge badge-green">Causal LM</span>
+            {% else %}
+            <span class="badge badge-blue">Masked LM</span>
+            {% endif %}
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Experiment Details</h1>
+        </div>
+        <a href="/experiments" class="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">&larr; Back to Experiments</a>
+    </div>
+    <div class="flex items-center justify-end gap-3">
+        {% if experiment.status == 'running' %}
+        <button type="button" id="stop-btn" onclick="stopExperiment()" class="bg-amber-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-amber-600 transition-all duration-200 shadow-sm hover:shadow-md flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path></svg>
+            Stop Training
+        </button>
+        {% endif %}
+        {% if experiment.status == 'completed' %}
+        <button type="button" id="evaluate-btn" onclick="openEvaluateModal()" class="bg-amber-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-amber-600 transition-all duration-200 shadow-sm hover:shadow-md flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            Evaluate
+        </button>
+        <form action="/experiments/{{ experiment.id }}/extract-meta" method="post" class="inline" id="extract-meta-form">
+            <button type="submit" id="extract-meta-btn" class="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                Extract for Meta
+            </button>
+        </form>
+        {% endif %}
+        <a href="/experiments/{{ experiment.id }}/copy" class="btn-primary flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+            Copy & Edit
+        </a>
+        <form action="/experiments/{{ experiment.id }}/delete" method="post" class="inline" onsubmit="return confirm('Delete this experiment and its artifacts?')">
+            <button type="submit" class="btn-danger flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                Delete
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Status Card -->
+<div class="card mb-6">
+    <div class="card-body">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div>
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Experiment ID</p>
+                <p class="font-mono text-sm text-gray-900 dark:text-gray-100">{{ experiment.id[:16] }}...</p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Status</p>
+                {% if experiment.status == 'completed' %}
+                <span class="badge badge-green">Completed</span>
+                {% elif experiment.status == 'running' %}
+                <span class="badge badge-blue">Running</span>
+                {% elif experiment.status == 'evaluating' %}
+                <span class="badge badge-purple">Evaluating</span>
+                {% elif experiment.status == 'failed' %}
+                <span class="badge badge-red">Failed</span>
+                {% elif experiment.status == 'stopped' %}
+                <span class="badge badge-amber">Stopped</span>
+                {% else %}
+                <span class="badge badge-gray">Pending</span>
+                {% endif %}
+            </div>
+            <div>
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Dataset</p>
+                <p class="text-sm text-gray-900 dark:text-gray-100">{{ experiment.dataset_filename or 'N/A' }}</p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Model</p>
+                <p class="font-mono text-sm text-gray-900 dark:text-gray-100">{{ experiment.config.model.pretrained_model_name | truncate(25) }}</p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Started</p>
+                <p class="text-sm text-gray-900 dark:text-gray-100"><span data-utc="{{ experiment.started_at }}">{{ experiment.started_at[:19] }}</span></p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Completed</p>
+                <p class="text-sm text-gray-900 dark:text-gray-100">{% if experiment.completed_at %}<span data-utc="{{ experiment.completed_at }}">{{ experiment.completed_at[:19] }}</span>{% else %}In progress...{% endif %}</p>
+            </div>
+            {% if experiment.output_dir %}
+            <div class="col-span-2">
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Output Directory</p>
+                <p class="font-mono text-sm text-gray-900 dark:text-gray-100">{{ experiment.output_dir }}</p>
+            </div>
+            {% endif %}
+        </div>
+        {% if experiment.error %}
+        <div class="mt-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+            <p class="text-sm font-medium text-red-800">Error</p>
+            <p class="text-sm text-red-700 mt-1">{{ experiment.error }}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if experiment.status == 'running' or experiment.status == 'pending' %}
+<!-- Sticky Progress Bar -->
+<div class="sticky top-16 z-40 -mx-4 px-4 py-3 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 shadow-sm">
+    <div class="flex items-center gap-4">
+        <div class="flex-1">
+            <div class="flex items-center justify-between mb-1">
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Training Progress</p>
+                <div class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                    <span id="progress-step">Step: --</span>
+                    <span id="progress-epoch">Epoch: -- / {{ experiment.config.training.num_train_epochs }}</span>
+                </div>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
+                <div id="progress-bar" class="progress-bar-animated h-2.5 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+            </div>
+        </div>
+        <p id="progress-text" class="text-lg font-semibold text-blue-600 dark:text-blue-400 min-w-[4rem] text-right">0%</p>
+    </div>
+</div>
+<style>
+    .progress-bar-animated {
+        background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 25%, #93c5fd 50%, #60a5fa 75%, #3b82f6 100%);
+        background-size: 200% 100%;
+        animation: shimmer 2s ease-in-out infinite;
+    }
+    @keyframes shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+</style>
+{% endif %}
+
+<!-- Metrics -->
+{% if experiment.metrics %}
+<div class="card mb-6">
+    <div class="card-header">
+        <h2 class="font-semibold text-gray-800 dark:text-gray-200">Training Metrics</h2>
+    </div>
+    <div class="card-body">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {% for key, value in experiment.metrics.items() %}
+            <div class="metric-card">
+                <p class="metric-label mb-1">{{ key.replace('_', ' ') }}</p>
+                <p class="metric-value">
+                    {% if value is number %}
+                        {% if value > 1000000 %}{{ "%.2e"|format(value) }}{% elif value > 100 %}{{ "%.1f"|format(value) }}{% else %}{{ "%.4f"|format(value) }}{% endif %}
+                    {% else %}{{ value }}{% endif %}
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Configuration -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="font-semibold text-gray-800 dark:text-gray-200">Configuration</h2>
+    </div>
+    <div class="card-body space-y-6">
+        <!-- Data Config -->
+        <div>
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
+                Data
+            </h3>
+            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    {% for key, value in experiment.config.data.items() %}
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">{{ key }}:</span>
+                        <span class="text-gray-900 dark:text-gray-100 ml-1 font-medium">{{ value if value is not none else 'N/A' }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Model Config -->
+        <div>
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                Model
+            </h3>
+            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    {% for key, value in experiment.config.model.items() %}
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">{{ key }}:</span>
+                        <span class="text-gray-900 dark:text-gray-100 ml-1 font-medium">{{ value if value is not none else 'N/A' }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Training Config -->
+        <div>
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                Training
+            </h3>
+            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    {% for key, value in experiment.config.training.items() %}
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">{{ key }}:</span>
+                        <span class="text-gray-900 dark:text-gray-100 ml-1 font-medium">{{ value if value is not none else 'N/A' }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- PEFT Config -->
+        {% if experiment.config.peft %}
+        <div>
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                PEFT / LoRA
+            </h3>
+            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    {% for key, value in experiment.config.peft.items() %}
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">{{ key }}:</span>
+                        <span class="text-gray-900 dark:text-gray-100 ml-1 font-medium">{{ value if value is not none else 'N/A' }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Learning Curve Chart -->
+<div class="card mt-6">
+    <div class="card-header">
+        <h2 class="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+            <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+            Learning Curve
+            {% if experiment.status == 'running' or experiment.status == 'pending' %}
+            <span class="text-xs font-medium text-blue-600 flex items-center gap-1">
+                <span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+                Live
+            </span>
+            {% endif %}
+        </h2>
+    </div>
+    <div class="card-body">
+        <div id="learning-curve-chart" style="width:100%; height:400px;"></div>
+    </div>
+</div>
+
+<!-- Training Logs -->
+<div class="card mt-6">
+    <div class="card-header flex items-center justify-between">
+        <h2 class="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+            <svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            Training Logs
+            {% if experiment.status == 'running' or experiment.status == 'pending' %}
+            <span id="logs-status" class="ml-2 text-xs font-medium text-blue-600 flex items-center gap-1">
+                <span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+                Live
+            </span>
+            {% endif %}
+        </h2>
+        <span id="logs-count" class="text-sm text-gray-500 dark:text-gray-400">{{ logs|length }} entries</span>
+    </div>
+    <div class="card-body">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm" id="logs-table">
+                <thead>
+                    <tr class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Step</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Epoch</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Loss</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Eval Loss</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Learning Rate</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Grad Norm</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-table-body" class="divide-y divide-gray-100 dark:divide-gray-700">
+                    {% for entry in logs %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800/50">
+                        <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">{{ entry.step if entry.step is defined else '-' }}</td>
+                        <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ "%.2f"|format(entry.epoch) if entry.epoch is defined else '-' }}</td>
+                        <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ "%.4f"|format(entry.loss) if entry.loss is defined else '-' }}</td>
+                        <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ "%.4f"|format(entry.eval_loss) if entry.eval_loss is defined else '-' }}</td>
+                        <td class="px-4 py-2 font-mono text-gray-600 dark:text-gray-400 text-xs">{{ "%.2e"|format(entry.learning_rate) if entry.learning_rate is defined else '-' }}</td>
+                        <td class="px-4 py-2 text-gray-700 dark:text-gray-300">{{ "%.2f"|format(entry.grad_norm) if entry.grad_norm is defined else '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p id="no-logs-msg" class="text-center text-gray-500 dark:text-gray-400 py-4 {% if logs %}hidden{% endif %}">No logs available yet</p>
+    </div>
+</div>
+
+<!-- Stop Training Modal -->
+{% if experiment.status == 'running' %}
+<div id="stop-modal" class="fixed inset-0 bg-gray-900/60 dark:bg-gray-900/80 backdrop-blur-sm hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 border border-gray-200 dark:border-gray-700">
+        <div class="p-6">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">Stop Training?</h3>
+                <p class="text-gray-600 dark:text-gray-400">This will interrupt the current training run. The model will be saved at its current state.</p>
+            </div>
+            
+            <!-- Current Progress Info -->
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6">
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p class="text-gray-500 dark:text-gray-400">Current Step</p>
+                        <p id="stop-modal-step" class="font-mono font-bold text-gray-900 dark:text-gray-100">--</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500 dark:text-gray-400">Current Epoch</p>
+                        <p id="stop-modal-epoch" class="font-mono font-bold text-gray-900 dark:text-gray-100">--</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500 dark:text-gray-400">Latest Loss</p>
+                        <p id="stop-modal-loss" class="font-mono font-bold text-gray-900 dark:text-gray-100">--</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500 dark:text-gray-400">Progress</p>
+                        <p id="stop-modal-progress" class="font-mono font-bold text-gray-900 dark:text-gray-100">--</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-end gap-3">
+                <button type="button" onclick="closeStopModal()" class="px-4 py-2 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">Cancel</button>
+                <button type="button" onclick="confirmStopTraining()" id="confirm-stop-btn" class="bg-red-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-red-700 transition-all flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path></svg>
+                    Stop Training
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Evaluate Modal -->
+{% if experiment.status == 'completed' %}
+<div id="evaluate-modal" class="fixed inset-0 bg-gray-900/60 dark:bg-gray-900/80 backdrop-blur-sm hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg mx-4 border border-gray-200 dark:border-gray-700">
+        <!-- Selection View -->
+        <div id="eval-select-view">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">Evaluate Model</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Select a benchmark to evaluate this model</p>
+            </div>
+            <div class="p-6">
+                <div class="form-group mb-6">
+                    <label class="form-label">Benchmark</label>
+                    <select id="benchmark-select" class="form-select" required>
+                        <option value="">Select a benchmark...</option>
+                        {% for bm in benchmarks %}
+                        <option value="{{ bm.id }}" data-name="{{ bm.name }}" data-question="{{ bm.question }}">{{ bm.name }}: {{ bm.question | truncate(50) }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" onclick="closeEvaluateModal()" class="px-4 py-2 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">Cancel</button>
+                    <button type="button" onclick="startEvaluation()" class="btn-primary" id="start-eval-btn">Start Evaluation</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Progress View -->
+        <div id="eval-progress-view" class="hidden">
+            <div class="p-6">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center">
+                        <svg id="eval-progress-icon" class="w-8 h-8 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <h3 id="eval-progress-title" class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">Evaluating Model...</h3>
+                    <p id="eval-progress-message" class="text-gray-600 dark:text-gray-400">Running inference and computing scores</p>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="mb-6">
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                        <div id="eval-progress-bar" class="bg-gradient-to-r from-amber-500 to-orange-600 h-3 rounded-full transition-all duration-500 animate-pulse" style="width: 50%"></div>
+                    </div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 text-center mt-2" id="eval-status-text">Status: Running</p>
+                </div>
+                
+                <!-- Result Display (hidden until complete) -->
+                <div id="eval-result-section" class="hidden">
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="metric-card text-center">
+                            <p class="metric-label mb-1">BLEU Score</p>
+                            <p id="eval-bleu-score" class="text-2xl font-bold text-blue-600">--</p>
+                        </div>
+                        <div class="metric-card text-center">
+                            <p class="metric-label mb-1">ROUGE-L Score</p>
+                            <p id="eval-rouge-score" class="text-2xl font-bold text-emerald-600">--</p>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Model Answer</p>
+                            <p id="eval-model-answer" class="text-sm text-gray-900 dark:text-gray-100 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800 max-h-32 overflow-y-auto"></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Error Display -->
+                <div id="eval-error-section" class="hidden mt-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+                    <p class="text-sm text-red-700 dark:text-red-300" id="eval-error-message"></p>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button id="eval-close-btn" onclick="closeEvaluateModal()" class="hidden px-4 py-2 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">Close</button>
+                    <a id="eval-view-btn" href="#" class="hidden btn-primary">View Details</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<script>
+    let chartInitialized = false;
+    
+    function isDarkMode() {
+        return document.documentElement.classList.contains('dark') || 
+               window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    
+    function getChartLayout() {
+        const dark = isDarkMode();
+        return {
+            title: {
+                text: '{{ experiment.config.model.pretrained_model_name }} Training Curve',
+                font: { color: dark ? '#e5e7eb' : '#1f2937' }
+            },
+            xaxis: {
+                title: 'Global Step',
+                color: dark ? '#9ca3af' : '#6b7280',
+                gridcolor: dark ? '#374151' : '#e5e7eb',
+                zerolinecolor: dark ? '#4b5563' : '#d1d5db'
+            },
+            yaxis: {
+                title: 'Loss',
+                color: dark ? '#9ca3af' : '#6b7280',
+                gridcolor: dark ? '#374151' : '#e5e7eb',
+                zerolinecolor: dark ? '#4b5563' : '#d1d5db',
+                side: 'left'
+            },
+            yaxis2: {
+                title: 'Learning Rate',
+                color: '#f59e0b',
+                overlaying: 'y',
+                side: 'right',
+                showgrid: false,
+                tickformat: '.1e'
+            },
+            paper_bgcolor: dark ? '#1f2937' : '#ffffff',
+            plot_bgcolor: dark ? '#111827' : '#ffffff',
+            legend: {
+                orientation: 'h',
+                y: -0.15,
+                font: { color: dark ? '#d1d5db' : '#374151' }
+            },
+            margin: {t: 50, b: 80, r: 60}
+        };
+    }
+    
+    function initOrUpdateChart(logs) {
+        const trainLoss = [];
+        const evalLoss = [];
+        const learningRate = [];
+        
+        logs.forEach(entry => {
+            if (entry.step !== undefined) {
+                if (entry.loss !== undefined) {
+                    trainLoss.push({x: entry.step, y: entry.loss});
+                }
+                if (entry.eval_loss !== undefined) {
+                    evalLoss.push({x: entry.step, y: entry.eval_loss});
+                }
+                if (entry.learning_rate !== undefined) {
+                    learningRate.push({x: entry.step, y: entry.learning_rate});
+                }
+            }
+        });
+        
+        if (trainLoss.length === 0 && evalLoss.length === 0) {
+            if (!chartInitialized) {
+                document.getElementById('learning-curve-chart').innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400 py-8">No loss data available yet. Waiting for training to start...</p>';
+            }
+            return;
+        }
+        
+        const traces = [];
+        if (trainLoss.length > 0) {
+            traces.push({
+                x: trainLoss.map(p => p.x),
+                y: trainLoss.map(p => p.y),
+                mode: 'lines+markers',
+                name: 'Train Loss',
+                line: {color: '#3b82f6'},
+                marker: {size: 6},
+                yaxis: 'y'
+            });
+        }
+        if (evalLoss.length > 0) {
+            traces.push({
+                x: evalLoss.map(p => p.x),
+                y: evalLoss.map(p => p.y),
+                mode: 'lines+markers',
+                name: 'Eval Loss',
+                line: {color: '#10b981'},
+                marker: {size: 6},
+                yaxis: 'y'
+            });
+        }
+        if (learningRate.length > 0) {
+            traces.push({
+                x: learningRate.map(p => p.x),
+                y: learningRate.map(p => p.y),
+                mode: 'lines',
+                name: 'Learning Rate',
+                line: {color: '#f59e0b', dash: 'dot', width: 2},
+                yaxis: 'y2'
+            });
+        }
+        
+        const layout = getChartLayout();
+        
+        if (!chartInitialized) {
+            Plotly.newPlot('learning-curve-chart', traces, layout, {responsive: true});
+            chartInitialized = true;
+        } else {
+            Plotly.react('learning-curve-chart', traces, layout);
+        }
+    }
+    
+    // Listen for dark mode changes
+    const darkModeObserver = new MutationObserver(() => {
+        if (chartInitialized) {
+            Plotly.relayout('learning-curve-chart', getChartLayout());
+        }
+    });
+    darkModeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    
+    // Also listen for system preference changes
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if (chartInitialized) {
+            Plotly.relayout('learning-curve-chart', getChartLayout());
+        }
+    });
+    
+    // Initialize with existing logs
+    {% if logs %}
+    initOrUpdateChart({{ logs | tojson }});
+    {% else %}
+    initOrUpdateChart([]);
+    {% endif %}
+</script>
+
+{% if experiment.status == 'running' or experiment.status == 'pending' %}
+<script>
+    const experimentId = "{{ experiment.id }}";
+    const totalEpochs = {{ experiment.config.training.num_train_epochs }};
+    let lastLogCount = 0;
+    let latestLogData = {};
+    
+    async function pollStatus() {
+        try {
+            const resp = await fetch('/api/experiments/' + experimentId);
+            if (!resp.ok) {
+                console.error('Status poll failed:', resp.status);
+                return;
+            }
+            const data = await resp.json();
+            console.log('Status poll:', data.status);
+            if (data.status !== 'running' && data.status !== 'pending') {
+                console.log('Experiment finished, reloading...');
+                window.location.reload();
+            }
+        } catch (e) {
+            console.error('Status poll error:', e);
+        }
+    }
+    
+    async function pollLogs() {
+        try {
+            const resp = await fetch('/api/experiments/' + experimentId + '/logs');
+            if (!resp.ok) {
+                console.error('Logs poll failed:', resp.status);
+                return;
+            }
+            const logs = await resp.json();
+            console.log('Logs poll:', logs.length, 'entries');
+            
+            // Update count display
+            const logsCountEl = document.getElementById('logs-count');
+            if (logsCountEl) {
+                logsCountEl.textContent = logs.length + ' entries';
+            }
+            
+            // Hide "no logs" message if we have logs
+            const noLogsMsg = document.getElementById('no-logs-msg');
+            if (logs.length > 0 && noLogsMsg) {
+                noLogsMsg.classList.add('hidden');
+            }
+            
+            if (logs.length > 0) {
+                const latest = logs[logs.length - 1];
+                latestLogData = latest;
+                console.log('Latest log:', latest);
+                
+                // Update progress bar
+                const progressBar = document.getElementById('progress-bar');
+                const progressText = document.getElementById('progress-text');
+                const progressEpoch = document.getElementById('progress-epoch');
+                const progressStep = document.getElementById('progress-step');
+                
+                if (latest.epoch !== undefined && progressBar) {
+                    const pct = Math.min(100, (latest.epoch / totalEpochs) * 100);
+                    progressBar.style.width = pct + '%';
+                    if (progressText) progressText.textContent = pct.toFixed(0) + '%';
+                    if (progressEpoch) progressEpoch.textContent = 'Epoch: ' + latest.epoch.toFixed(2) + ' / ' + totalEpochs;
+                }
+                if (latest.step !== undefined && progressStep) {
+                    progressStep.textContent = 'Step: ' + latest.step;
+                }
+                
+                // Update table if new logs arrived
+                if (logs.length > lastLogCount) {
+                    console.log('New logs arrived:', logs.length - lastLogCount);
+                    updateLogsTable(logs);
+                    lastLogCount = logs.length;
+                    
+                    // Update chart with new data
+                    if (typeof initOrUpdateChart === 'function') {
+                        initOrUpdateChart(logs);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Logs poll error:', e);
+        }
+    }
+    
+    function updateLogsTable(logs) {
+        const tbody = document.getElementById('logs-table-body');
+        tbody.innerHTML = '';
+        
+        logs.forEach(entry => {
+            const row = document.createElement('tr');
+            row.className = 'hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800/50';
+            row.innerHTML = `
+                <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">${entry.step !== undefined ? entry.step : '-'}</td>
+                <td class="px-4 py-2 text-gray-700 dark:text-gray-300">${entry.epoch !== undefined ? entry.epoch.toFixed(2) : '-'}</td>
+                <td class="px-4 py-2 text-gray-700 dark:text-gray-300">${entry.loss !== undefined ? entry.loss.toFixed(4) : '-'}</td>
+                <td class="px-4 py-2 text-gray-700 dark:text-gray-300">${entry.eval_loss !== undefined ? entry.eval_loss.toFixed(4) : '-'}</td>
+                <td class="px-4 py-2 font-mono text-gray-600 dark:text-gray-400 text-xs">${entry.learning_rate !== undefined ? entry.learning_rate.toExponential(2) : '-'}</td>
+                <td class="px-4 py-2 text-gray-700 dark:text-gray-300">${entry.grad_norm !== undefined ? entry.grad_norm.toFixed(2) : '-'}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+    
+    function stopExperiment() {
+        // Update modal with current progress
+        if (latestLogData.step !== undefined) {
+            document.getElementById('stop-modal-step').textContent = latestLogData.step;
+        }
+        if (latestLogData.epoch !== undefined) {
+            document.getElementById('stop-modal-epoch').textContent = latestLogData.epoch.toFixed(2) + ' / ' + totalEpochs;
+            const pct = Math.min(100, (latestLogData.epoch / totalEpochs) * 100);
+            document.getElementById('stop-modal-progress').textContent = pct.toFixed(0) + '%';
+        }
+        if (latestLogData.loss !== undefined) {
+            document.getElementById('stop-modal-loss').textContent = latestLogData.loss.toFixed(4);
+        }
+        
+        // Show modal
+        document.getElementById('stop-modal').classList.remove('hidden');
+        document.getElementById('stop-modal').classList.add('flex');
+    }
+    
+    function closeStopModal() {
+        document.getElementById('stop-modal').classList.add('hidden');
+        document.getElementById('stop-modal').classList.remove('flex');
+    }
+    
+    let stopPollingInterval = null;
+    
+    async function confirmStopTraining() {
+        const btn = document.getElementById('confirm-stop-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Stopping...';
+        
+        // Hide cancel button
+        document.querySelector('#stop-modal button[onclick="closeStopModal()"]').classList.add('hidden');
+        
+        try {
+            // Call API to stop
+            await fetch('/api/experiments/' + experimentId + '/stop', {method: 'POST'});
+            
+            // Poll for status change
+            stopPollingInterval = setInterval(async () => {
+                try {
+                    const resp = await fetch('/api/experiments/' + experimentId);
+                    const data = await resp.json();
+                    if (data.status !== 'running' && data.status !== 'pending') {
+                        clearInterval(stopPollingInterval);
+                        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Stopped!';
+                        setTimeout(() => window.location.reload(), 1000);
+                    }
+                } catch (e) {
+                    console.error('Stop poll error:', e);
+                }
+            }, 1000);
+            
+        } catch (e) {
+            console.error('Stop error:', e);
+            btn.disabled = false;
+            btn.innerHTML = 'Stop Training';
+            document.querySelector('#stop-modal button[onclick="closeStopModal()"]').classList.remove('hidden');
+        }
+    }
+    
+    // Start polling immediately and then at intervals
+    console.log('Starting live polling for experiment:', experimentId);
+    pollLogs();
+    pollStatus();
+    setInterval(pollStatus, 5000);
+    setInterval(pollLogs, 2000);
+</script>
+{% endif %}
+
+{% if experiment.status == 'completed' %}
+<script>
+    let evalPollingInterval = null;
+    let currentEvalId = null;
+    
+    function openEvaluateModal() {
+        // Reset to selection view
+        document.getElementById('eval-select-view').classList.remove('hidden');
+        document.getElementById('eval-progress-view').classList.add('hidden');
+        document.getElementById('evaluate-modal').classList.remove('hidden');
+        document.getElementById('evaluate-modal').classList.add('flex');
+    }
+    
+    function closeEvaluateModal() {
+        if (evalPollingInterval) {
+            clearInterval(evalPollingInterval);
+            evalPollingInterval = null;
+        }
+        document.getElementById('evaluate-modal').classList.add('hidden');
+        document.getElementById('evaluate-modal').classList.remove('flex');
+    }
+    
+    async function startEvaluation() {
+        const benchmarkSelect = document.getElementById('benchmark-select');
+        const benchmarkId = benchmarkSelect.value;
+        
+        if (!benchmarkId) {
+            alert('Please select a benchmark');
+            return;
+        }
+        
+        // Switch to progress view
+        document.getElementById('eval-select-view').classList.add('hidden');
+        document.getElementById('eval-progress-view').classList.remove('hidden');
+        document.getElementById('eval-result-section').classList.add('hidden');
+        document.getElementById('eval-error-section').classList.add('hidden');
+        document.getElementById('eval-close-btn').classList.add('hidden');
+        document.getElementById('eval-view-btn').classList.add('hidden');
+        document.getElementById('eval-progress-bar').style.width = '30%';
+        document.getElementById('eval-progress-title').textContent = 'Evaluating Model...';
+        document.getElementById('eval-progress-message').textContent = 'Running inference and computing scores';
+        document.getElementById('eval-status-text').textContent = 'Status: Starting...';
+        
+        try {
+            // Start the evaluation via POST
+            const resp = await fetch('/benchmarks/' + benchmarkId + '/evaluate?experiment_id={{ experiment.id }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            });
+            
+            // The response will be a redirect, so we need to get the eval_id from URL
+            // Actually, let's call the API directly instead
+            const apiResp = await fetch('/api/proxy/benchmarks/' + benchmarkId + '/evaluate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ experiment_id: '{{ experiment.id }}' })
+            });
+            
+            if (!apiResp.ok) {
+                throw new Error('Failed to start evaluation');
+            }
+            
+            const data = await apiResp.json();
+            currentEvalId = data.eval_id;
+            
+            document.getElementById('eval-progress-bar').style.width = '50%';
+            document.getElementById('eval-status-text').textContent = 'Status: Running';
+            
+            // Start polling for completion
+            evalPollingInterval = setInterval(pollEvalStatus, 2000);
+            
+        } catch (error) {
+            showEvalError(error.message);
+        }
+    }
+    
+    async function pollEvalStatus() {
+        if (!currentEvalId) return;
+        
+        try {
+            const resp = await fetch('/api/evaluations/' + currentEvalId);
+            const data = await resp.json();
+            
+            if (data.status === 'completed') {
+                clearInterval(evalPollingInterval);
+                evalPollingInterval = null;
+                showEvalComplete(data);
+            } else if (data.status === 'failed') {
+                clearInterval(evalPollingInterval);
+                evalPollingInterval = null;
+                showEvalError(data.error || 'Evaluation failed');
+            } else {
+                // Still running
+                document.getElementById('eval-progress-bar').style.width = '70%';
+                document.getElementById('eval-status-text').textContent = 'Status: ' + data.status;
+            }
+        } catch (error) {
+            console.error('Poll error:', error);
+        }
+    }
+    
+    function showEvalComplete(data) {
+        document.getElementById('eval-progress-bar').style.width = '100%';
+        document.getElementById('eval-progress-bar').classList.remove('animate-pulse');
+        document.getElementById('eval-progress-bar').classList.remove('from-amber-500', 'to-orange-600');
+        document.getElementById('eval-progress-bar').classList.add('from-emerald-500', 'to-green-600');
+        
+        document.getElementById('eval-progress-icon').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>';
+        document.getElementById('eval-progress-icon').classList.remove('animate-pulse');
+        document.getElementById('eval-progress-title').textContent = 'Evaluation Complete!';
+        document.getElementById('eval-progress-message').textContent = 'Model evaluation finished successfully';
+        document.getElementById('eval-status-text').textContent = 'Status: Completed';
+        
+        // Show results
+        document.getElementById('eval-bleu-score').textContent = data.bleu_score.toFixed(2);
+        document.getElementById('eval-rouge-score').textContent = data.rouge_score.toFixed(2);
+        document.getElementById('eval-model-answer').textContent = data.model_answer || 'No answer generated';
+        
+        // Color the ROUGE score
+        const rougeEl = document.getElementById('eval-rouge-score');
+        rougeEl.classList.remove('text-emerald-600', 'text-amber-600', 'text-red-600');
+        if (data.rouge_score > 50) {
+            rougeEl.classList.add('text-emerald-600');
+        } else if (data.rouge_score > 20) {
+            rougeEl.classList.add('text-amber-600');
+        } else {
+            rougeEl.classList.add('text-red-600');
+        }
+        
+        document.getElementById('eval-result-section').classList.remove('hidden');
+        document.getElementById('eval-close-btn').classList.remove('hidden');
+        document.getElementById('eval-view-btn').classList.remove('hidden');
+        document.getElementById('eval-view-btn').href = '/evaluations/' + currentEvalId;
+    }
+    
+    function showEvalError(message) {
+        document.getElementById('eval-progress-bar').classList.remove('animate-pulse');
+        document.getElementById('eval-progress-bar').classList.remove('from-amber-500', 'to-orange-600');
+        document.getElementById('eval-progress-bar').classList.add('from-red-500', 'to-red-600');
+        
+        document.getElementById('eval-progress-title').textContent = 'Evaluation Failed';
+        document.getElementById('eval-progress-message').textContent = '';
+        document.getElementById('eval-status-text').textContent = 'Status: Failed';
+        
+        document.getElementById('eval-error-message').textContent = message;
+        document.getElementById('eval-error-section').classList.remove('hidden');
+        document.getElementById('eval-close-btn').classList.remove('hidden');
+    }
+</script>
+{% endif %}
+{% endblock %}
+
+

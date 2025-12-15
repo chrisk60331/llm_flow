@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Evaluation Details - AIP-C01 Prep{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-3">
+        <span class="badge badge-blue">{{ evaluation.benchmark_name }}</span>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Evaluation Details</h1>
+    </div>
+    <a href="/benchmarks" class="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">&larr; Back to Benchmarks</a>
+</div>
+
+<!-- Summary Card -->
+<div class="card mb-6">
+    <div class="card-body">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div>
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Status</p>
+                {% if evaluation.status == 'completed' %}
+                <span class="badge badge-green">Completed</span>
+                {% elif evaluation.status == 'running' %}
+                <span class="badge badge-blue">Running</span>
+                {% elif evaluation.status == 'failed' %}
+                <span class="badge badge-red">Failed</span>
+                {% else %}
+                <span class="badge badge-gray">Pending</span>
+                {% endif %}
+            </div>
+            <div>
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Experiment</p>
+                <a href="/experiments/{{ evaluation.experiment_id }}" class="font-mono text-sm text-primary-600 hover:text-primary-800 hover:underline">{{ evaluation.experiment_id[:8] }}...</a>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Started</p>
+                <p class="text-sm text-gray-900 dark:text-gray-100"><span data-utc="{{ evaluation.started_at }}">{{ evaluation.started_at[:19] }}</span></p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Completed</p>
+                <p class="text-sm text-gray-900 dark:text-gray-100">{% if evaluation.completed_at %}<span data-utc="{{ evaluation.completed_at }}">{{ evaluation.completed_at[:19] }}</span>{% else %}In progress...{% endif %}</p>
+            </div>
+        </div>
+        {% if evaluation.error %}
+        <div class="mt-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+            <p class="text-sm font-medium text-red-800">Error</p>
+            <p class="text-sm text-red-700 mt-1">{{ evaluation.error }}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ROUGE Score -->
+{% if evaluation.status == 'completed' %}
+<div class="metric-card mb-6 text-center py-8">
+    <p class="metric-label mb-2">ROUGE-L Score</p>
+    <p class="text-5xl font-bold {% if evaluation.rouge_score > 50 %}text-emerald-600{% elif evaluation.rouge_score > 20 %}text-amber-600{% else %}text-red-600{% endif %}">{{ "%.2f"|format(evaluation.rouge_score) }}</p>
+</div>
+{% endif %}
+
+<!-- Q&A Comparison -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="font-semibold text-gray-800 dark:text-gray-200">Question & Answer Comparison</h2>
+    </div>
+    <div class="card-body space-y-4">
+        <div>
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Question</p>
+            <p class="text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">{{ evaluation.question }}</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <p class="text-xs font-medium text-emerald-600 uppercase mb-1">Gold Answer</p>
+                <p class="text-sm text-gray-900 dark:text-gray-100 bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded-lg border border-emerald-200 dark:border-emerald-800 min-h-24">{{ evaluation.gold_answer }}</p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-blue-600 uppercase mb-1">Model Answer</p>
+                <p class="text-sm text-gray-900 dark:text-gray-100 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800 min-h-24">{{ evaluation.model_answer or 'Pending...' }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

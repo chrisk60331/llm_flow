@@ -1,0 +1,481 @@
+{% extends "base.html" %}
+
+{% block title %}Home - AIP-C01 Prep{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <div class="text-center mb-10">
+        <h1 class="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-3">ML Experiment Platform</h1>
+        <p class="text-lg text-gray-600 dark:text-gray-400">Fine-tune language models with ease</p>
+    </div>
+    
+    <!-- AutoTune Hero Button -->
+    <div class="mb-10">
+        <button onclick="openAutoTuneModal()" class="w-full p-6 bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:via-purple-500 hover:to-indigo-500 rounded-2xl shadow-lg hover:shadow-xl transition-all group text-left">
+            <div class="flex items-center justify-center gap-4">
+                <div class="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                </div>
+                <div class="text-left">
+                    <h2 class="text-2xl font-bold text-white">AutoTune Fine-Tuning</h2>
+                    <p class="text-white/80 text-sm">Automatically find the best config, train, and evaluate with one click</p>
+                </div>
+                <svg class="w-6 h-6 text-white/80 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </div>
+        </button>
+    </div>
+    
+    <!-- Workflow Guide -->
+    <div class="card mb-10">
+        <div class="card-header">
+            <h2 class="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                Workflow Guide
+            </h2>
+        </div>
+        <div class="card-body space-y-3">
+            <!-- Step 1: Upload Dataset -->
+            <a href="/datasets" class="flex items-center gap-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 transition-all group">
+                <div class="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 group-hover:scale-110 transition-transform">1</div>
+                <div class="flex-grow">
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Upload Dataset</h3>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">Upload CSV with question/answer pairs for training</p>
+                </div>
+                <span class="badge badge-blue">{{ stats.datasets }} datasets</span>
+            </a>
+            
+            <!-- Step 2: Create Config -->
+            <a href="/configs" class="flex items-center gap-4 p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 hover:shadow-md hover:border-purple-300 dark:hover:border-purple-600 transition-all group">
+                <div class="w-10 h-10 bg-purple-500 text-white rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 group-hover:scale-110 transition-transform">2</div>
+                <div class="flex-grow">
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Create Config</h3>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">Define model, training params, and LoRA settings</p>
+                </div>
+                <span class="badge badge-purple">{{ stats.configs }} configs</span>
+            </a>
+            
+            <!-- Step 3: Run Experiment -->
+            <a href="/experiments" class="flex items-center gap-4 p-4 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-600 transition-all group">
+                <div class="w-10 h-10 bg-emerald-500 text-white rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 group-hover:scale-110 transition-transform">3</div>
+                <div class="flex-grow">
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Run Experiment</h3>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">Train Masked LM or Causal LM with your config</p>
+                </div>
+                <span class="badge badge-green">{{ stats.models }} models</span>
+            </a>
+            
+            <!-- Step 4: Create Benchmark -->
+            <a href="/benchmarks" class="flex items-center gap-4 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 hover:shadow-md hover:border-amber-300 dark:hover:border-amber-600 transition-all group">
+                <div class="w-10 h-10 bg-amber-500 text-white rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 group-hover:scale-110 transition-transform">4</div>
+                <div class="flex-grow">
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Create Benchmark</h3>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">Define Q/A pairs with gold answers for testing</p>
+                </div>
+                <span class="badge badge-amber">{{ stats.benchmarks }} benchmarks</span>
+            </a>
+            
+            <!-- Step 5: Evaluate -->
+            <a href="/evaluations" class="flex items-center gap-4 p-4 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 hover:shadow-md hover:border-rose-300 dark:hover:border-rose-600 transition-all group">
+                <div class="w-10 h-10 bg-rose-500 text-white rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 group-hover:scale-110 transition-transform">5</div>
+                <div class="flex-grow">
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Evaluate</h3>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">Run benchmarks to get ROUGE scores on trained models</p>
+                </div>
+                <span class="badge badge-red">{{ stats.evals }} evals</span>
+            </a>
+            
+            <!-- Step 6: Meta-Learn -->
+            <a href="/meta" class="flex items-center gap-4 p-4 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800 hover:shadow-md hover:border-violet-300 dark:hover:border-violet-600 transition-all group">
+                <div class="w-10 h-10 bg-violet-500 text-white rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 group-hover:scale-110 transition-transform">6</div>
+                <div class="flex-grow">
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Meta-Learn</h3>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">Train predictor on meta-features to forecast performance</p>
+                </div>
+                <span class="badge badge-purple">{{ stats.meta_features }} features</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- AutoTune Modal -->
+<div id="autotune-modal" class="fixed inset-0 bg-gray-900/60 dark:bg-gray-900/80 backdrop-blur-sm hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-700">
+        <!-- Config View -->
+        <div id="autotune-config-view">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">AutoTune Configuration</h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Configure and launch automated fine-tuning</p>
+                        </div>
+                    </div>
+                    <button onclick="closeAutoTuneModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6 space-y-6">
+                <!-- Dataset Selection -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
+                        <h4 class="section-title">Dataset</h4>
+                    </div>
+                    <div class="section-body">
+                        <select id="at-dataset" class="form-select" required>
+                            <option value="">Select a dataset...</option>
+                            {% for ds in datasets %}
+                            <option value="{{ ds.id }}">{{ ds.filename }} ({{ ds.row_count }} rows)</option>
+                            {% endfor %}
+                        </select>
+                        {% if not datasets %}
+                        <p class="text-sm text-amber-600 mt-2">No datasets available. Upload a dataset first.</p>
+                        {% endif %}
+                        <div class="grid grid-cols-2 gap-4 mt-4">
+                            <div class="form-group">
+                                <label class="form-label">Question Field</label>
+                                <input type="text" id="at-question-field" value="question" class="form-input">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Answer Field</label>
+                                <input type="text" id="at-answer-field" value="answer" class="form-input">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Benchmark Selection -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        <h4 class="section-title">Benchmark</h4>
+                    </div>
+                    <div class="section-body">
+                        <select id="at-benchmark" class="form-select">
+                            <option value="">Select a benchmark (optional)...</option>
+                            {% for bm in benchmarks %}
+                            <option value="{{ bm.id }}">{{ bm.name }}: {{ bm.question | truncate(50) }}</option>
+                            {% endfor %}
+                        </select>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">If not selected, will use first row of dataset as benchmark</p>
+                    </div>
+                </div>
+                
+                <!-- Base Config Selection -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        <h4 class="section-title">Base Configuration</h4>
+                    </div>
+                    <div class="section-body">
+                        <select id="at-config" class="form-select">
+                            <option value="">Use Sensible Defaults (TinyLlama + LoRA)</option>
+                            {% for cfg in configs %}
+                            {% if cfg.experiment_type == 'causal_lm' %}
+                            <option value="{{ cfg.id }}">{{ cfg.name }} ({{ cfg.config.model.pretrained_model_name | truncate(30) }})</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">AutoTune will vary LR, LoRA rank, batch size around this config</p>
+                    </div>
+                </div>
+                
+                <!-- Training Options -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                        <h4 class="section-title">Training Options</h4>
+                    </div>
+                    <div class="section-body">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Configs to Train</label>
+                                <select id="at-top-k" class="form-select">
+                                    <option value="3">Top 3 configs</option>
+                                    <option value="5" selected>Top 5 configs</option>
+                                    <option value="7">Top 7 configs</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Probe Steps</label>
+                                <input type="number" id="at-probe-steps" value="5" min="1" max="50" class="form-input">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Lower = faster</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Submit Button -->
+                <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" onclick="closeAutoTuneModal()" class="px-4 py-2 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">Cancel</button>
+                    <button type="button" onclick="startAutoTune()" id="at-start-btn" class="btn-primary px-8 flex items-center gap-2" {% if not datasets %}disabled{% endif %}>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        Launch AutoTune
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Progress View -->
+        <div id="autotune-progress-view" class="hidden">
+            <div class="p-6">
+                <div class="text-center mb-6">
+                    <div id="at-icon-container" class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-full flex items-center justify-center">
+                        <svg id="at-icon" class="w-8 h-8 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <h3 id="at-title" class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">AutoTune Running</h3>
+                    <p id="at-message" class="text-gray-600 dark:text-gray-400">Starting AutoTune...</p>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="mb-6">
+                    <div class="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-2">
+                        <span id="at-phase">Phase: Initializing</span>
+                        <span id="at-status-badge" class="badge badge-blue">pending</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                        <div id="at-progress-bar" class="bg-gradient-to-r from-violet-500 to-indigo-600 h-3 rounded-full transition-all duration-500 animate-pulse" style="width: 5%"></div>
+                    </div>
+                </div>
+                
+                <!-- Candidates Table -->
+                <div id="at-candidates-section" class="hidden">
+                    <h4 class="font-semibold text-gray-800 dark:text-gray-200 mb-3">Config Candidates</h4>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="bg-gray-50 dark:bg-gray-700">
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Rank</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">LR</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">LoRA r</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Batch</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Predicted</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Actual</th>
+                                </tr>
+                            </thead>
+                            <tbody id="at-candidates-body" class="divide-y divide-gray-100 dark:divide-gray-700">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Error Display -->
+                <div id="at-error-section" class="hidden mt-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+                    <p class="text-sm text-red-700 dark:text-red-300" id="at-error-message"></p>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button id="at-close-btn" onclick="closeAutoTuneModal()" class="hidden px-4 py-2 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">Close</button>
+                    <a id="at-view-btn" href="/evaluations" class="hidden btn-primary px-6">View Results</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let autotunePollingInterval = null;
+    let currentAutotuneJobId = null;
+    
+    function openAutoTuneModal() {
+        document.getElementById('autotune-config-view').classList.remove('hidden');
+        document.getElementById('autotune-progress-view').classList.add('hidden');
+        document.getElementById('autotune-modal').classList.remove('hidden');
+        document.getElementById('autotune-modal').classList.add('flex');
+    }
+    
+    function closeAutoTuneModal() {
+        if (autotunePollingInterval) {
+            clearInterval(autotunePollingInterval);
+            autotunePollingInterval = null;
+        }
+        document.getElementById('autotune-modal').classList.add('hidden');
+        document.getElementById('autotune-modal').classList.remove('flex');
+    }
+    
+    async function startAutoTune() {
+        const datasetId = document.getElementById('at-dataset').value;
+        if (!datasetId) {
+            alert('Please select a dataset');
+            return;
+        }
+        
+        const payload = {
+            dataset_id: datasetId,
+            question_field: document.getElementById('at-question-field').value || 'question',
+            answer_field: document.getElementById('at-answer-field').value || 'answer',
+            benchmark_id: document.getElementById('at-benchmark').value || null,
+            base_config_id: document.getElementById('at-config').value || null,
+            top_k: parseInt(document.getElementById('at-top-k').value) || 5,
+            probe_steps: parseInt(document.getElementById('at-probe-steps').value) || 5
+        };
+        
+        // Switch to progress view
+        document.getElementById('autotune-config-view').classList.add('hidden');
+        document.getElementById('autotune-progress-view').classList.remove('hidden');
+        resetProgressView();
+        
+        try {
+            const resp = await fetch('/api/autotune/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            if (!resp.ok) {
+                const errorData = await resp.json();
+                throw new Error(errorData.detail || 'Failed to start AutoTune');
+            }
+            
+            const data = await resp.json();
+            currentAutotuneJobId = data.job_id;
+            
+            document.getElementById('at-progress-bar').style.width = '10%';
+            document.getElementById('at-phase').textContent = 'Phase: Starting';
+            
+            // Start polling
+            autotunePollingInterval = setInterval(pollAutotuneStatus, 3000);
+            
+        } catch (error) {
+            showAutotuneError(error.message);
+        }
+    }
+    
+    function resetProgressView() {
+        document.getElementById('at-progress-bar').style.width = '5%';
+        document.getElementById('at-progress-bar').classList.add('animate-pulse');
+        document.getElementById('at-progress-bar').classList.remove('from-emerald-500', 'to-green-600', 'from-red-500', 'to-red-600');
+        document.getElementById('at-progress-bar').classList.add('from-violet-500', 'to-indigo-600');
+        document.getElementById('at-icon').classList.add('animate-pulse');
+        document.getElementById('at-icon-container').classList.remove('from-emerald-500', 'to-green-600', 'from-red-500', 'to-red-600');
+        document.getElementById('at-icon-container').classList.add('from-violet-500', 'to-indigo-600');
+        document.getElementById('at-title').textContent = 'AutoTune Running';
+        document.getElementById('at-message').textContent = 'Starting AutoTune...';
+        document.getElementById('at-phase').textContent = 'Phase: Initializing';
+        document.getElementById('at-status-badge').textContent = 'pending';
+        document.getElementById('at-status-badge').className = 'badge badge-blue';
+        document.getElementById('at-candidates-section').classList.add('hidden');
+        document.getElementById('at-error-section').classList.add('hidden');
+        document.getElementById('at-close-btn').classList.add('hidden');
+        document.getElementById('at-view-btn').classList.add('hidden');
+        document.getElementById('at-candidates-body').innerHTML = '';
+    }
+    
+    async function pollAutotuneStatus() {
+        if (!currentAutotuneJobId) return;
+        
+        try {
+            const resp = await fetch('/api/autotune/' + currentAutotuneJobId);
+            const data = await resp.json();
+            
+            // Update status badge
+            document.getElementById('at-status-badge').textContent = data.status;
+            if (data.status === 'completed') {
+                document.getElementById('at-status-badge').className = 'badge badge-green';
+            } else if (data.status === 'failed') {
+                document.getElementById('at-status-badge').className = 'badge badge-red';
+            } else {
+                document.getElementById('at-status-badge').className = 'badge badge-blue';
+            }
+            
+            // Update phase message
+            if (data.phase_message) {
+                document.getElementById('at-phase').textContent = 'Phase: ' + data.phase_message;
+                document.getElementById('at-message').textContent = data.phase_message;
+            }
+            
+            // Update candidates if available
+            if (data.candidates && data.candidates.length > 0) {
+                updateCandidatesTable(data.candidates);
+            }
+            
+            // Calculate progress
+            let progress = 10;
+            if (data.status === 'probing') progress = 30;
+            else if (data.status === 'training') progress = 50 + (data.trained_count || 0) * 10;
+            else if (data.status === 'evaluating') progress = 80;
+            else if (data.status === 'completed') progress = 100;
+            document.getElementById('at-progress-bar').style.width = progress + '%';
+            
+            if (data.status === 'completed') {
+                clearInterval(autotunePollingInterval);
+                autotunePollingInterval = null;
+                showAutotuneComplete(data);
+            } else if (data.status === 'failed') {
+                clearInterval(autotunePollingInterval);
+                autotunePollingInterval = null;
+                showAutotuneError(data.error || 'AutoTune failed');
+            }
+            
+        } catch (error) {
+            console.error('Poll error:', error);
+        }
+    }
+    
+    function updateCandidatesTable(candidates) {
+        document.getElementById('at-candidates-section').classList.remove('hidden');
+        const tbody = document.getElementById('at-candidates-body');
+        tbody.innerHTML = '';
+        
+        candidates.forEach((c, idx) => {
+            const row = document.createElement('tr');
+            row.className = 'hover:bg-gray-50 dark:hover:bg-gray-700';
+            row.innerHTML = `
+                <td class="px-3 py-2 font-medium">${idx + 1}</td>
+                <td class="px-3 py-2 font-mono text-xs">${c.learning_rate ? c.learning_rate.toExponential(0) : '-'}</td>
+                <td class="px-3 py-2">${c.lora_r || '-'}</td>
+                <td class="px-3 py-2">${c.batch_size || '-'}</td>
+                <td class="px-3 py-2 font-mono text-purple-600">${c.predicted_score ? c.predicted_score.toFixed(2) : '-'}</td>
+                <td class="px-3 py-2 font-mono text-emerald-600 font-bold">${c.actual_score ? c.actual_score.toFixed(2) : '-'}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+    
+    function showAutotuneComplete(data) {
+        document.getElementById('at-progress-bar').classList.remove('animate-pulse', 'from-violet-500', 'to-indigo-600');
+        document.getElementById('at-progress-bar').classList.add('from-emerald-500', 'to-green-600');
+        document.getElementById('at-icon-container').classList.remove('from-violet-500', 'to-indigo-600');
+        document.getElementById('at-icon-container').classList.add('from-emerald-500', 'to-green-600');
+        document.getElementById('at-icon').classList.remove('animate-pulse');
+        document.getElementById('at-icon').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>';
+        
+        document.getElementById('at-title').textContent = 'AutoTune Complete!';
+        document.getElementById('at-message').textContent = 'Finished training and evaluating all configurations';
+        
+        document.getElementById('at-close-btn').classList.remove('hidden');
+        document.getElementById('at-view-btn').classList.remove('hidden');
+    }
+    
+    function showAutotuneError(message) {
+        document.getElementById('at-progress-bar').classList.remove('animate-pulse', 'from-violet-500', 'to-indigo-600');
+        document.getElementById('at-progress-bar').classList.add('from-red-500', 'to-red-600');
+        document.getElementById('at-icon-container').classList.remove('from-violet-500', 'to-indigo-600');
+        document.getElementById('at-icon-container').classList.add('from-red-500', 'to-red-600');
+        document.getElementById('at-icon').classList.remove('animate-pulse');
+        document.getElementById('at-icon').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>';
+        
+        document.getElementById('at-title').textContent = 'AutoTune Failed';
+        document.getElementById('at-message').textContent = '';
+        document.getElementById('at-error-message').textContent = message;
+        document.getElementById('at-error-section').classList.remove('hidden');
+        document.getElementById('at-close-btn').classList.remove('hidden');
+    }
+</script>
+{% endblock %}

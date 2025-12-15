@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Config - AIP-C01 Prep{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Edit Configuration</h1>
+                {% if config.experiment_type == 'causal_lm' %}
+                <span class="badge badge-green">Causal LM</span>
+                {% else %}
+                <span class="badge badge-blue">Masked LM</span>
+                {% endif %}
+            </div>
+            <a href="/configs/{{ config.id }}" class="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">&larr; Back to Config</a>
+        </div>
+        <p class="text-gray-600 dark:text-gray-400">
+            Editing <span class="font-medium text-gray-900 dark:text-gray-100">{{ config.name }}</span> - saves as new config
+        </p>
+    </div>
+    
+    <form action="/configs/{{ config.id }}/edit" method="post" class="space-y-6">
+        <!-- New Config Name -->
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+                <h2 class="section-title">New Config Name</h2>
+            </div>
+            <div class="section-body">
+                <div class="form-group">
+                    <label class="form-label">Name for the new config</label>
+                    <input type="text" name="new_name" value="{{ config.name }}-copy" class="form-input" placeholder="my-config-v2">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Leave empty to auto-generate a friendly name</p>
+                </div>
+            </div>
+        </div>
+        
+        {% if config.experiment_type == 'causal_lm' %}
+        <!-- Causal LM Config -->
+        
+        <!-- Data Config -->
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
+                <h2 class="section-title">Data Configuration</h2>
+            </div>
+            <div class="section-body space-y-4">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="form-group">
+                        <label class="form-label">Question Field</label>
+                        <input type="text" name="question_field" value="{{ config.config.data.question_field }}" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Answer Field</label>
+                        <input type="text" name="answer_field" value="{{ config.config.data.answer_field }}" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Validation Split</label>
+                        <input type="number" name="validation_split" value="{{ config.config.data.validation_split }}" step="0.05" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Max Length</label>
+                        <input type="number" name="max_length" value="{{ config.config.data.max_length }}" class="form-input">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">System Prompt</label>
+                    <textarea name="system_prompt" rows="2" class="form-textarea">{{ config.config.data.system_prompt }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Template</label>
+                    <textarea name="template" rows="4" class="form-textarea font-mono text-xs">{{ config.config.data.template }}</textarea>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Model Config -->
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                <h2 class="section-title">Model Configuration</h2>
+            </div>
+            <div class="section-body">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-group">
+                        <label class="form-label">Pretrained Model</label>
+                        <input type="text" name="pretrained_model_name" value="{{ config.config.model.pretrained_model_name }}" class="form-input font-mono">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Pad Token Override</label>
+                        <input type="text" name="pad_token_override" value="{{ config.config.model.pad_token_override or '' }}" class="form-input font-mono">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- PEFT Config -->
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                <h2 class="section-title">PEFT / LoRA Configuration</h2>
+            </div>
+            <div class="section-body">
+                <div class="flex items-center gap-3 mb-4">
+                    <input type="checkbox" name="peft_enabled" id="peft_enabled" class="form-checkbox" {% if config.config.peft.enabled %}checked{% endif %}>
+                    <label for="peft_enabled" class="text-sm text-gray-700 dark:text-gray-300">Enable PEFT/LoRA</label>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="form-group">
+                        <label class="form-label">LoRA Rank (r)</label>
+                        <input type="number" name="peft_r" value="{{ config.config.peft.r }}" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">LoRA Alpha</label>
+                        <input type="number" name="peft_lora_alpha" value="{{ config.config.peft.lora_alpha }}" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">LoRA Dropout</label>
+                        <input type="number" name="peft_lora_dropout" value="{{ config.config.peft.lora_dropout }}" step="0.01" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Bias</label>
+                        <select name="peft_bias" class="form-select">
+                            <option value="none" {% if config.config.peft.bias == 'none' %}selected{% endif %}>none</option>
+                            <option value="lora_only" {% if config.config.peft.bias == 'lora_only' %}selected{% endif %}>lora_only</option>
+                            <option value="all" {% if config.config.peft.bias == 'all' %}selected{% endif %}>all</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group mt-4">
+                    <label class="form-label">Target Modules (comma-separated)</label>
+                    <input type="text" name="peft_target_modules" value="{{ config.config.peft.target_modules | join(',') }}" class="form-input font-mono">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Training Config -->
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                <h2 class="section-title">Training Configuration</h2>
+            </div>
+            <div class="section-body">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="form-group">
+                        <label class="form-label">Epochs</label>
+                        <input type="number" name="num_train_epochs" value="{{ config.config.training.num_train_epochs }}" step="0.5" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Learning Rate</label>
+                        <input type="text" name="learning_rate" value="{{ config.config.training.learning_rate }}" class="form-input font-mono">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Batch Size</label>
+                        <input type="number" name="per_device_train_batch_size" value="{{ config.config.training.per_device_train_batch_size }}" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Gradient Accumulation</label>
+                        <input type="number" name="gradient_accumulation_steps" value="{{ config.config.training.gradient_accumulation_steps }}" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Weight Decay</label>
+                        <input type="number" name="weight_decay" value="{{ config.config.training.weight_decay }}" step="0.001" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Warmup Ratio</label>
+                        <input type="number" name="warmup_ratio" value="{{ config.config.training.warmup_ratio }}" step="0.01" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">LR Scheduler</label>
+                        <select name="lr_scheduler_type" class="form-select">
+                            <option value="cosine" {% if config.config.training.lr_scheduler_type == 'cosine' %}selected{% endif %}>cosine</option>
+                            <option value="linear" {% if config.config.training.lr_scheduler_type == 'linear' %}selected{% endif %}>linear</option>
+                            <option value="constant" {% if config.config.training.lr_scheduler_type == 'constant' %}selected{% endif %}>constant</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Max Steps</label>
+                        <input type="number" name="max_steps" value="{{ config.config.training.max_steps }}" class="form-input">
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4 mt-4">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" name="gradient_checkpointing" id="gradient_checkpointing" class="form-checkbox" {% if config.config.training.gradient_checkpointing %}checked{% endif %}>
+                        <label for="gradient_checkpointing" class="text-sm text-gray-700 dark:text-gray-300">Gradient Checkpointing</label>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" name="fp16" id="fp16" class="form-checkbox" {% if config.config.training.fp16 %}checked{% endif %}>
+                        <label for="fp16" class="text-sm text-gray-700 dark:text-gray-300">FP16</label>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" name="bf16" id="bf16" class="form-checkbox" {% if config.config.training.bf16 %}checked{% endif %}>
+                        <label for="bf16" class="text-sm text-gray-700 dark:text-gray-300">BF16</label>
+                    </div>
+                </div>
+                <!-- Early Stopping -->
+                <div class="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <div class="form-group">
+                        <label class="form-label">Early Stopping Patience</label>
+                        <input type="number" name="early_stopping_patience" value="{{ config.config.training.early_stopping_patience if config.config.training.early_stopping_patience else '' }}" placeholder="e.g. 3" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Early Stopping Metric</label>
+                        <select name="early_stopping_metric" class="form-select">
+                            <option value="eval_loss" {% if not config.config.training.early_stopping_metric or config.config.training.early_stopping_metric == 'eval_loss' %}selected{% endif %}>eval_loss</option>
+                            <option value="eval_accuracy" {% if config.config.training.early_stopping_metric == 'eval_accuracy' %}selected{% endif %}>eval_accuracy</option>
+                            <option value="eval_f1" {% if config.config.training.early_stopping_metric == 'eval_f1' %}selected{% endif %}>eval_f1</option>
+                            <option value="eval_perplexity" {% if config.config.training.early_stopping_metric == 'eval_perplexity' %}selected{% endif %}>eval_perplexity</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2 pt-6">
+                        <input type="checkbox" name="early_stopping_greater_is_better" id="early_stopping_greater_is_better_edit" class="form-checkbox" {% if config.config.training.early_stopping_greater_is_better %}checked{% endif %}>
+                        <label for="early_stopping_greater_is_better_edit" class="text-sm text-gray-700 dark:text-gray-300">Greater is Better</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        {% else %}
+        <!-- Masked LM Config -->
+        
+        <!-- Data Config -->
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
+                <h2 class="section-title">Data Configuration</h2>
+            </div>
+            <div class="section-body">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="form-group md:col-span-2">
+                        <label class="form-label">Text Fields (comma-separated)</label>
+                        <input type="text" name="text_fields" value="{{ config.config.data.text_fields | join(',') }}" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Separator</label>
+                        <input type="text" name="separator" value="{{ config.config.data.separator | replace('\n', '\\n') }}" class="form-input font-mono">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Max Length</label>
+                        <input type="number" name="max_length" value="{{ config.config.data.max_length }}" class="form-input">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Model Config -->
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                <h2 class="section-title">Model Configuration</h2>
+            </div>
+            <div class="section-body">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="form-group md:col-span-2">
+                        <label class="form-label">Pretrained Model</label>
+                        <input type="text" name="pretrained_model_name" value="{{ config.config.model.pretrained_model_name }}" class="form-input font-mono">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Freeze Encoder Layers</label>
+                        <input type="number" name="freeze_encoder_layers" value="{{ config.config.model.freeze_encoder_layers }}" min="0" class="form-input">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Training Config -->
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                <h2 class="section-title">Training Configuration</h2>
+            </div>
+            <div class="section-body">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="form-group">
+                        <label class="form-label">Epochs</label>
+                        <input type="number" name="num_train_epochs" value="{{ config.config.training.num_train_epochs }}" step="0.5" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Learning Rate</label>
+                        <input type="text" name="learning_rate" value="{{ config.config.training.learning_rate }}" class="form-input font-mono">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Batch Size</label>
+                        <input type="number" name="per_device_train_batch_size" value="{{ config.config.training.per_device_train_batch_size }}" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Weight Decay</label>
+                        <input type="number" name="weight_decay" value="{{ config.config.training.weight_decay }}" step="0.001" class="form-input">
+                    </div>
+                </div>
+                <!-- Early Stopping -->
+                <div class="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <div class="form-group">
+                        <label class="form-label">Early Stopping Patience</label>
+                        <input type="number" name="early_stopping_patience" value="{{ config.config.training.early_stopping_patience if config.config.training.early_stopping_patience else '' }}" placeholder="e.g. 3" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Early Stopping Metric</label>
+                        <select name="early_stopping_metric" class="form-select">
+                            <option value="eval_loss" {% if not config.config.training.early_stopping_metric or config.config.training.early_stopping_metric == 'eval_loss' %}selected{% endif %}>eval_loss</option>
+                            <option value="eval_accuracy" {% if config.config.training.early_stopping_metric == 'eval_accuracy' %}selected{% endif %}>eval_accuracy</option>
+                            <option value="eval_f1" {% if config.config.training.early_stopping_metric == 'eval_f1' %}selected{% endif %}>eval_f1</option>
+                            <option value="eval_perplexity" {% if config.config.training.early_stopping_metric == 'eval_perplexity' %}selected{% endif %}>eval_perplexity</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2 pt-6">
+                        <input type="checkbox" name="early_stopping_greater_is_better" id="early_stopping_greater_is_better_mlm_edit" class="form-checkbox" {% if config.config.training.early_stopping_greater_is_better %}checked{% endif %}>
+                        <label for="early_stopping_greater_is_better_mlm_edit" class="text-sm text-gray-700 dark:text-gray-300">Greater is Better</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Submit -->
+        <div class="flex items-center justify-end gap-4">
+            <a href="/configs/{{ config.id }}" class="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">Cancel</a>
+            <button type="submit" class="btn-success flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                Save as New Config
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+

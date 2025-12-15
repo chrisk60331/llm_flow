@@ -1,0 +1,374 @@
+{% extends "base.html" %}
+
+{% block title %}Evaluations - AIP-C01 Prep{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Evaluation Results</h1>
+    <p class="text-gray-600 dark:text-gray-400">Compare benchmark evaluations across experiments</p>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 items-end">
+            <div class="form-group">
+                <label class="form-label text-xs">Benchmark</label>
+                <select id="filter-benchmark" class="form-select text-sm" onchange="applyFilters()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label text-xs">Experiment</label>
+                <select id="filter-experiment" class="form-select text-sm" onchange="applyFilters()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label text-xs">BLEU Score</label>
+                <select id="filter-bleu" class="form-select text-sm" onchange="applyFilters()">
+                    <option value="">All</option>
+                    <option value=">=50">≥ 50 (Good)</option>
+                    <option value=">=20">≥ 20</option>
+                    <option value="<20">< 20</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label text-xs">ROUGE Score</label>
+                <select id="filter-rouge" class="form-select text-sm" onchange="applyFilters()">
+                    <option value="">All</option>
+                    <option value=">=50">≥ 50 (Good)</option>
+                    <option value=">=20">≥ 20</option>
+                    <option value="<20">< 20</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label text-xs">Status</label>
+                <select id="filter-status" class="form-select text-sm" onchange="applyFilters()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label text-xs">Completed</label>
+                <select id="filter-completed" class="form-select text-sm" onchange="applyFilters()">
+                    <option value="">All</option>
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                    <option value="pending">Pending</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <button onclick="clearFilters()" class="w-full px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-all">
+                    Clear All
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="overflow-x-auto">
+        <table class="w-full" id="evaluations-table">
+            <thead>
+                <tr class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(0, 'string')">
+                        <div class="flex items-center gap-1">Benchmark <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(1, 'string')">
+                        <div class="flex items-center gap-1">Experiment <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(2, 'number')">
+                        <div class="flex items-center justify-center gap-1">BLEU <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(3, 'number')">
+                        <div class="flex items-center justify-center gap-1">ROUGE <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(4, 'string')">
+                        <div class="flex items-center justify-center gap-1">Status <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(5, 'date')">
+                        <div class="flex items-center gap-1">Completed <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-700" id="evaluations-body">
+                {% for ev in evaluations %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors eval-row" 
+                    data-benchmark="{{ ev.benchmark_name }}" 
+                    data-experiment="{{ ev.experiment_id[:8] }}"
+                    data-bleu="{{ ev.bleu_score if ev.status == 'completed' else '' }}"
+                    data-rouge="{{ ev.rouge_score if ev.status == 'completed' else '' }}"
+                    data-status="{{ ev.status }}"
+                    data-completed="{{ ev.completed_at or '' }}">
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ ev.benchmark_name }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 font-mono">
+                        <a href="/experiments/{{ ev.experiment_id }}" class="text-primary-600 hover:underline">{{ ev.experiment_id[:8] }}...</a>
+                    </td>
+                    <td class="px-4 py-3 text-center" data-value="{{ ev.bleu_score if ev.status == 'completed' else -1 }}">
+                        {% if ev.status == 'completed' %}
+                        <span class="font-mono text-blue-600 dark:text-blue-400">{{ "%.2f"|format(ev.bleu_score) }}</span>
+                        {% else %}
+                        <span class="text-gray-400">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-center" data-value="{{ ev.rouge_score if ev.status == 'completed' else -1 }}">
+                        {% if ev.status == 'completed' %}
+                        <span class="font-mono font-bold {% if ev.rouge_score > 50 %}text-emerald-600 dark:text-emerald-400{% elif ev.rouge_score > 20 %}text-amber-600 dark:text-amber-400{% else %}text-red-600 dark:text-red-400{% endif %}">{{ "%.2f"|format(ev.rouge_score) }}</span>
+                        {% else %}
+                        <span class="text-gray-400">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        {% if ev.status == 'completed' %}
+                        <span class="badge badge-green">completed</span>
+                        {% elif ev.status == 'running' %}
+                        <span class="badge badge-blue">running</span>
+                        {% elif ev.status == 'failed' %}
+                        <span class="badge badge-red">failed</span>
+                        {% else %}
+                        <span class="badge badge-gray">{{ ev.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400" data-value="{{ ev.completed_at or '' }}">
+                        {% if ev.completed_at %}
+                        <span data-utc="{{ ev.completed_at }}">{{ ev.completed_at[:10] if ev.completed_at is string else ev.completed_at.strftime('%Y-%m-%d') }}</span>
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <div class="flex items-center justify-end gap-2">
+                            <a href="/evaluations/{{ ev.id }}" class="text-sm font-medium text-primary-600 hover:text-primary-800">View</a>
+                            <form action="/evaluations/{{ ev.id }}/delete" method="post" class="inline" onsubmit="return confirm('Delete this evaluation?')">
+                                <button type="submit" class="text-sm font-medium text-red-500 hover:text-red-700">Delete</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr id="empty-row">
+                    <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        <div class="flex flex-col items-center">
+                            <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                            <p>No evaluations yet. Run a benchmark on a completed experiment.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div id="no-results" class="hidden px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+        <p>No evaluations match the current filters.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentSort = { column: -1, direction: 'asc' };
+    
+    // Populate filter dropdowns from data
+    document.addEventListener('DOMContentLoaded', function() {
+        const rows = document.querySelectorAll('.eval-row');
+        const benchmarks = new Set();
+        const experiments = new Set();
+        const statuses = new Set();
+        
+        rows.forEach(row => {
+            benchmarks.add(row.dataset.benchmark);
+            experiments.add(row.dataset.experiment);
+            statuses.add(row.dataset.status);
+        });
+        
+        // Populate benchmark filter
+        const benchmarkSelect = document.getElementById('filter-benchmark');
+        [...benchmarks].sort().forEach(b => {
+            const opt = document.createElement('option');
+            opt.value = b;
+            opt.textContent = b;
+            benchmarkSelect.appendChild(opt);
+        });
+        
+        // Populate experiment filter
+        const experimentSelect = document.getElementById('filter-experiment');
+        [...experiments].sort().forEach(e => {
+            const opt = document.createElement('option');
+            opt.value = e;
+            opt.textContent = e + '...';
+            experimentSelect.appendChild(opt);
+        });
+        
+        // Populate status filter
+        const statusSelect = document.getElementById('filter-status');
+        [...statuses].sort().forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s;
+            opt.textContent = s.charAt(0).toUpperCase() + s.slice(1);
+            statusSelect.appendChild(opt);
+        });
+    });
+    
+    function applyFilters() {
+        const benchmarkFilter = document.getElementById('filter-benchmark').value;
+        const experimentFilter = document.getElementById('filter-experiment').value;
+        const bleuFilter = document.getElementById('filter-bleu').value;
+        const rougeFilter = document.getElementById('filter-rouge').value;
+        const statusFilter = document.getElementById('filter-status').value;
+        const completedFilter = document.getElementById('filter-completed').value;
+        
+        const rows = document.querySelectorAll('.eval-row');
+        let visibleCount = 0;
+        
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const weekStart = new Date(todayStart);
+        weekStart.setDate(weekStart.getDate() - 7);
+        const monthStart = new Date(todayStart);
+        monthStart.setMonth(monthStart.getMonth() - 1);
+        
+        rows.forEach(row => {
+            let match = true;
+            
+            // Benchmark filter
+            if (benchmarkFilter && row.dataset.benchmark !== benchmarkFilter) {
+                match = false;
+            }
+            
+            // Experiment filter
+            if (match && experimentFilter && row.dataset.experiment !== experimentFilter) {
+                match = false;
+            }
+            
+            // BLEU filter
+            if (match && bleuFilter) {
+                const bleu = parseFloat(row.dataset.bleu);
+                if (isNaN(bleu)) {
+                    match = false;
+                } else if (bleuFilter === '>=50' && bleu < 50) {
+                    match = false;
+                } else if (bleuFilter === '>=20' && bleu < 20) {
+                    match = false;
+                } else if (bleuFilter === '<20' && bleu >= 20) {
+                    match = false;
+                }
+            }
+            
+            // ROUGE filter
+            if (match && rougeFilter) {
+                const rouge = parseFloat(row.dataset.rouge);
+                if (isNaN(rouge)) {
+                    match = false;
+                } else if (rougeFilter === '>=50' && rouge < 50) {
+                    match = false;
+                } else if (rougeFilter === '>=20' && rouge < 20) {
+                    match = false;
+                } else if (rougeFilter === '<20' && rouge >= 20) {
+                    match = false;
+                }
+            }
+            
+            // Status filter
+            if (match && statusFilter && row.dataset.status !== statusFilter) {
+                match = false;
+            }
+            
+            // Completed filter
+            if (match && completedFilter) {
+                const completed = row.dataset.completed;
+                if (completedFilter === 'pending') {
+                    if (completed) match = false;
+                } else if (!completed) {
+                    match = false;
+                } else {
+                    const completedDate = new Date(completed);
+                    if (completedFilter === 'today' && completedDate < todayStart) {
+                        match = false;
+                    } else if (completedFilter === 'week' && completedDate < weekStart) {
+                        match = false;
+                    } else if (completedFilter === 'month' && completedDate < monthStart) {
+                        match = false;
+                    }
+                }
+            }
+            
+            if (match) {
+                row.classList.remove('hidden');
+                visibleCount++;
+            } else {
+                row.classList.add('hidden');
+            }
+        });
+        
+        // Show/hide no results message
+        const noResults = document.getElementById('no-results');
+        if (visibleCount === 0 && rows.length > 0) {
+            noResults.classList.remove('hidden');
+        } else {
+            noResults.classList.add('hidden');
+        }
+    }
+    
+    function clearFilters() {
+        document.getElementById('filter-benchmark').value = '';
+        document.getElementById('filter-experiment').value = '';
+        document.getElementById('filter-bleu').value = '';
+        document.getElementById('filter-rouge').value = '';
+        document.getElementById('filter-status').value = '';
+        document.getElementById('filter-completed').value = '';
+        applyFilters();
+    }
+    
+    function sortTable(columnIndex, type) {
+        const tbody = document.getElementById('evaluations-body');
+        const rows = Array.from(tbody.querySelectorAll('.eval-row'));
+        
+        if (rows.length === 0) return;
+        
+        // Toggle direction if same column
+        if (currentSort.column === columnIndex) {
+            currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSort.column = columnIndex;
+            currentSort.direction = 'asc';
+        }
+        
+        rows.sort((a, b) => {
+            let aVal, bVal;
+            const aCell = a.cells[columnIndex];
+            const bCell = b.cells[columnIndex];
+            
+            if (type === 'number') {
+                aVal = parseFloat(aCell.dataset.value || aCell.textContent.replace(/[^\d.-]/g, '')) || -Infinity;
+                bVal = parseFloat(bCell.dataset.value || bCell.textContent.replace(/[^\d.-]/g, '')) || -Infinity;
+            } else if (type === 'date') {
+                aVal = aCell.dataset.value || '';
+                bVal = bCell.dataset.value || '';
+            } else {
+                aVal = aCell.textContent.trim().toLowerCase();
+                bVal = bCell.textContent.trim().toLowerCase();
+            }
+            
+            let comparison = 0;
+            if (aVal < bVal) comparison = -1;
+            else if (aVal > bVal) comparison = 1;
+            
+            return currentSort.direction === 'asc' ? comparison : -comparison;
+        });
+        
+        // Re-append sorted rows
+        rows.forEach(row => tbody.appendChild(row));
+        
+        // Update sort icons
+        document.querySelectorAll('.sort-icon').forEach((icon, idx) => {
+            if (idx === columnIndex) {
+                icon.textContent = currentSort.direction === 'asc' ? '↑' : '↓';
+            } else {
+                icon.textContent = '↕';
+            }
+        });
+    }
+</script>
+{% endblock %}

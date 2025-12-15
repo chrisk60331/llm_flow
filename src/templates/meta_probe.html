@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Meta Probe{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Meta-Learning Probe</h1>
+        <p class="text-gray-600 dark:text-gray-400">Predict performance before full training on {{ dataset.filename }}</p>
+    </div>
+    
+    <form action="/meta/probe" method="post" class="space-y-6">
+        <input type="hidden" name="dataset_id" value="{{ dataset.id }}">
+        
+        <!-- Config Selection -->
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                <h2 class="section-title">Configuration</h2>
+            </div>
+            <div class="section-body">
+                <div class="form-group mb-4">
+                    <label class="form-label">Select Config to Probe</label>
+                    <select name="config_id" class="form-select" required>
+                        <option value="">Select a Causal LM config...</option>
+                        {% for cfg in configs %}
+                        <option value="{{ cfg.id }}">{{ cfg.name }} ({{ cfg.config.model.pretrained_model_name | truncate(30) }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Probe Steps</label>
+                    <input type="number" name="probe_steps" value="5" min="1" max="50" class="form-input w-32">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Number of training steps for feature extraction</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Dataset Info -->
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
+                <h2 class="section-title">Dataset</h2>
+            </div>
+            <div class="section-body">
+                <div class="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">Filename:</span>
+                        <span class="text-gray-900 dark:text-gray-100 ml-1 font-medium">{{ dataset.filename }}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">Rows:</span>
+                        <span class="text-gray-900 dark:text-gray-100 ml-1 font-medium">{{ dataset.row_count }}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">Columns:</span>
+                        <span class="text-gray-900 dark:text-gray-100 ml-1 font-medium">{{ dataset.columns | join(', ') }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Submit -->
+        <div class="flex items-center justify-end gap-4">
+            <a href="/meta" class="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">Cancel</a>
+            <button type="submit" class="btn-primary flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                Run Probe
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+

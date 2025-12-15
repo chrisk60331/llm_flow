@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Meta Optimize{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Hyperparameter Optimization</h1>
+        <p class="text-gray-600 dark:text-gray-400">Use meta-learning to find optimal hyperparameters for {{ dataset.filename }}</p>
+    </div>
+    
+    <form action="/meta/optimize" method="post" class="space-y-6">
+        <input type="hidden" name="dataset_id" value="{{ dataset.id }}">
+        
+        <!-- Optimization Settings -->
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                <h2 class="section-title">Optimization Settings</h2>
+            </div>
+            <div class="section-body">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="form-group">
+                        <label class="form-label">Target Metric</label>
+                        <select name="target_metric" class="form-select">
+                            <option value="final_bleu_score" selected>BLEU Score</option>
+                            <option value="final_eval_loss">Eval Loss (minimize)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Number of Trials</label>
+                        <input type="number" name="n_trials" value="20" min="5" max="100" class="form-input">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Dataset Info -->
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
+                <h2 class="section-title">Dataset</h2>
+            </div>
+            <div class="section-body">
+                <div class="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">Filename:</span>
+                        <span class="text-gray-900 dark:text-gray-100 ml-1 font-medium">{{ dataset.filename }}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">Rows:</span>
+                        <span class="text-gray-900 dark:text-gray-100 ml-1 font-medium">{{ dataset.row_count }}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">Columns:</span>
+                        <span class="text-gray-900 dark:text-gray-100 ml-1 font-medium">{{ dataset.columns | join(', ') }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Submit -->
+        <div class="flex items-center justify-end gap-4">
+            <a href="/meta" class="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">Cancel</a>
+            <button type="submit" class="btn-primary flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                Start Optimization
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+

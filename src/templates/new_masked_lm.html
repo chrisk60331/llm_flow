@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}New Masked LM Experiment{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="mb-6">
+        <div class="flex items-center gap-3 mb-2">
+            <span class="badge badge-blue">Masked LM</span>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">New Experiment</h1>
+        </div>
+        <p class="text-gray-600 dark:text-gray-400">
+            Dataset: <span class="font-medium text-gray-900 dark:text-gray-100">{{ dataset.filename }}</span> 
+            <span class="text-gray-400">•</span> {{ dataset.row_count }} rows 
+            <span class="text-gray-400">•</span> Columns: {{ dataset.columns | join(', ') }}
+        </p>
+    </div>
+    
+    <form action="/experiments/masked-lm" method="post" class="space-y-6">
+        <input type="hidden" name="dataset_id" value="{{ dataset.id }}">
+        
+        <!-- Config Selection -->
+        {% if configs %}
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                <h2 class="section-title">Use Saved Config</h2>
+            </div>
+            <div class="section-body">
+                <select name="config_id" class="form-select">
+                    <option value="">-- Create new config below --</option>
+                    {% for cfg in configs %}
+                    <option value="{{ cfg.id }}">{{ cfg.name }} ({{ cfg.config.model.pretrained_model_name }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Data Config -->
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
+                <h2 class="section-title">Data Configuration</h2>
+            </div>
+            <div class="section-body">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="form-group col-span-2">
+                        <label class="form-label">Text Fields (comma-separated)</label>
+                        <input type="text" name="text_fields" value="question,answer" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Separator</label>
+                        <input type="text" name="separator" value="\n\n" class="form-input font-mono">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Max Length</label>
+                        <input type="number" name="max_length" value="256" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Validation Split</label>
+                        <input type="number" name="validation_split" value="0.2" step="0.05" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Seed</label>
+                        <input type="number" name="seed" value="42" class="form-input">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Model Config -->
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                <h2 class="section-title">Model Configuration</h2>
+            </div>
+            <div class="section-body">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="form-group">
+                        <label class="form-label">Pretrained Model</label>
+                        <input type="text" name="pretrained_model_name" value="distilbert-base-uncased" class="form-input font-mono">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Freeze Encoder Layers</label>
+                        <input type="number" name="freeze_encoder_layers" value="0" min="0" max="12" class="form-input">
+                        <p class="text-xs text-gray-400 mt-1">0-6 for DistilBERT</p>
+                    </div>
+                    <div class="form-group flex items-end pb-2">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" name="freeze_embedding" id="freeze_embedding" class="form-checkbox">
+                            <label for="freeze_embedding" class="text-sm text-gray-700 dark:text-gray-300">Freeze Embeddings</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Training Config -->
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                <h2 class="section-title">Training Configuration</h2>
+            </div>
+            <div class="section-body space-y-4">
+                <!-- Core Training Params -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="form-group">
+                        <label class="form-label">Epochs</label>
+                        <input type="number" name="num_train_epochs" value="3" step="0.5" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Max Steps</label>
+                        <input type="number" name="max_steps" value="-1" class="form-input">
+                        <p class="text-xs text-gray-400 mt-1">-1 = use epochs</p>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Learning Rate</label>
+                        <input type="text" name="learning_rate" value="5e-5" class="form-input font-mono">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Weight Decay</label>
+                        <input type="number" name="weight_decay" value="0.01" step="0.001" class="form-input">
+                    </div>
+                </div>
+                
+                <!-- Batch & Memory -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="form-group">
+                        <label class="form-label">Train Batch Size</label>
+                        <input type="number" name="per_device_train_batch_size" value="8" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Eval Batch Size</label>
+                        <input type="number" name="per_device_eval_batch_size" value="8" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Gradient Accumulation</label>
+                        <input type="number" name="gradient_accumulation_steps" value="1" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Warmup Ratio</label>
+                        <input type="number" name="warmup_ratio" value="0.0" step="0.01" class="form-input">
+                    </div>
+                </div>
+                
+                <!-- Logging & Checkpoints -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="form-group">
+                        <label class="form-label">Logging Steps</label>
+                        <input type="number" name="logging_steps" value="10" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Eval Steps</label>
+                        <input type="number" name="eval_steps" value="50" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Save Steps</label>
+                        <input type="number" name="save_steps" value="200" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Save Total Limit</label>
+                        <input type="number" name="save_total_limit" value="2" class="form-input">
+                    </div>
+                </div>
+                
+                <!-- Early Stopping -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="form-group">
+                        <label class="form-label">Early Stop Patience</label>
+                        <input type="number" name="early_stopping_patience" value="" placeholder="None" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Early Stop Metric</label>
+                        <input type="text" name="early_stopping_metric" value="eval_loss" class="form-input">
+                    </div>
+                </div>
+                
+                <!-- Flags -->
+                <div class="flex flex-wrap items-center gap-6 pt-2">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" name="auto_evaluate" id="auto_evaluate" class="form-checkbox">
+                        <label for="auto_evaluate" class="text-sm text-gray-700 dark:text-gray-300">Auto-Evaluate on Completion</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Submit -->
+        <div class="flex items-center justify-end gap-4">
+            <a href="/datasets" class="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">Cancel</a>
+            <button type="submit" class="btn-success flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                Start Training
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
