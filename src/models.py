@@ -279,6 +279,13 @@ class BenchmarkListResponse(BaseModel):
     benchmarks: list[Benchmark]
 
 
+class BenchmarkRunScore(BaseModel):
+    run_number: int
+    model_answer: str
+    bleu_score: float
+    rouge_score: float
+
+
 class BenchmarkEvalResult(BaseModel):
     id: str
     benchmark_id: str
@@ -289,6 +296,8 @@ class BenchmarkEvalResult(BaseModel):
     model_answer: str
     bleu_score: float
     rouge_score: float
+    num_runs: int = 1
+    run_scores: list[BenchmarkRunScore] = Field(default_factory=list)
     status: BenchmarkStatus
     started_at: datetime
     completed_at: datetime | None = None
@@ -300,6 +309,7 @@ class BenchmarkEvalRequest(BaseModel):
     max_new_tokens: PositiveInt = Field(default=128)
     temperature: PositiveFloat = Field(default=0.7)
     top_p: PositiveFloat = Field(default=0.9)
+    num_runs: PositiveInt = Field(default=1, description="Number of times to run evaluation and average scores")
 
 
 class BenchmarkEvalStartResponse(BaseModel):

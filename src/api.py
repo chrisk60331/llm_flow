@@ -748,29 +748,40 @@ def _run_benchmark_eval(
     experiment: ExperimentResult,
     request: BenchmarkEvalRequest,
 ) -> None:
+    from src.models import BenchmarkRunScore
+    
     eval_result = storage.get_benchmark_eval(eval_id)
     eval_result.status = BenchmarkStatus.RUNNING
+    eval_result.num_runs = request.num_runs
     storage.save_benchmark_eval(eval_result)
 
     try:
         model_path = Path(experiment.output_dir)
         model, tokenizer = load_model_and_tokenizer(model_path)
 
-        model_answer = generate_response(
-            model=model,
-            tokenizer=tokenizer,
-            prompt=benchmark.question,
-            max_new_tokens=request.max_new_tokens,
-            temperature=request.temperature,
-            top_p=request.top_p,
-        )
+        run_scores: list[BenchmarkRunScore] = []
+        for run_num in range(1, request.num_runs + 1):
+            model_answer = generate_response(
+                model=model,
+                tokenizer=tokenizer,
+                prompt=benchmark.question,
+                max_new_tokens=request.max_new_tokens,
+                temperature=request.temperature,
+                top_p=request.top_p,
+            )
+            bleu = compute_bleu_score(model_answer, benchmark.gold_answer)
+            rouge = compute_rouge_l_score(model_answer, benchmark.gold_answer)
+            run_scores.append(BenchmarkRunScore(
+                run_number=run_num,
+                model_answer=model_answer,
+                bleu_score=bleu,
+                rouge_score=rouge,
+            ))
 
-        bleu_score = compute_bleu_score(model_answer, benchmark.gold_answer)
-        rouge_score = compute_rouge_l_score(model_answer, benchmark.gold_answer)
-
-        eval_result.model_answer = model_answer
-        eval_result.bleu_score = bleu_score
-        eval_result.rouge_score = rouge_score
+        eval_result.run_scores = run_scores
+        eval_result.model_answer = run_scores[-1].model_answer
+        eval_result.bleu_score = sum(r.bleu_score for r in run_scores) / len(run_scores)
+        eval_result.rouge_score = sum(r.rouge_score for r in run_scores) / len(run_scores)
         eval_result.status = BenchmarkStatus.COMPLETED
     except Exception as e:
         eval_result.status = BenchmarkStatus.FAILED
@@ -809,6 +820,7 @@ def start_benchmark_evaluation(benchmark_id: str, request: BenchmarkEvalRequest)
         model_answer="",
         bleu_score=0.0,
         rouge_score=0.0,
+        num_runs=request.num_runs,
         status=BenchmarkStatus.PENDING,
         started_at=_now(),
     )

@@ -3188,7 +3188,7 @@ EXPERIMENT_DETAIL_TEMPLATE = (
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="grid grid-cols-3 gap-4">
+                        <div class="grid grid-cols-4 gap-4">
                             <div class="form-group">
                                 <label class="form-label">Max Tokens</label>
                                 <input type="number" name="max_new_tokens" value="128" class="form-input">
@@ -3200,6 +3200,17 @@ EXPERIMENT_DETAIL_TEMPLATE = (
                             <div class="form-group">
                                 <label class="form-label">Top P</label>
                                 <input type="number" name="top_p" value="0.9" step="0.05" min="0" max="1" class="form-input">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label flex items-center gap-1">Repeat Runs
+                                    <span class="group relative"><svg class="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span class="tooltip-content">Run benchmark multiple times and average scores. Model stays loaded between runs.</span></span>
+                                </label>
+                                <select name="num_runs" class="form-select">
+                                    <option value="1">1 run</option>
+                                    <option value="3">3 runs</option>
+                                    <option value="5" selected>5 runs</option>
+                                    <option value="10">10 runs</option>
+                                </select>
                             </div>
                         </div>
                         <div class="flex justify-end gap-3 pt-2">
@@ -3261,7 +3272,8 @@ EXPERIMENT_DETAIL_TEMPLATE = (
                         experiment_id: "{{ experiment.id }}",
                         max_new_tokens: parseInt(formData.get('max_new_tokens')),
                         temperature: parseFloat(formData.get('temperature')),
-                        top_p: parseFloat(formData.get('top_p'))
+                        top_p: parseFloat(formData.get('top_p')),
+                        num_runs: parseInt(formData.get('num_runs'))
                     };
                     
                     // Show progress
@@ -3532,7 +3544,7 @@ BENCHMARK_EVALUATE_TEMPLATE = (
                         <h2 class="section-title">Generation Settings</h2>
                     </div>
                     <div class="section-body">
-                        <div class="grid grid-cols-3 gap-4">
+                        <div class="grid grid-cols-4 gap-4">
                             <div class="form-group">
                                 <label class="form-label flex items-center gap-1">Max New Tokens
                                     <span class="group relative"><svg class="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span class="tooltip-content">Maximum number of tokens to generate in the response. Longer answers need more tokens. Range: 32-512</span></span>
@@ -3550,6 +3562,17 @@ BENCHMARK_EVALUATE_TEMPLATE = (
                                     <span class="group relative"><svg class="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span class="tooltip-content">Nucleus sampling threshold. Only consider tokens with cumulative probability up to top_p. Range: 0.0-1.0, typical: 0.9</span></span>
                                 </label>
                                 <input type="number" name="top_p" value="0.9" step="0.05" class="form-input">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label flex items-center gap-1">Repeat Runs
+                                    <span class="group relative"><svg class="w-4 h-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span class="tooltip-content">Run benchmark multiple times and average scores. Model stays loaded between runs.</span></span>
+                                </label>
+                                <select name="num_runs" class="form-select">
+                                    <option value="1">1 run</option>
+                                    <option value="3">3 runs</option>
+                                    <option value="5" selected>5 runs</option>
+                                    <option value="10">10 runs</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -3855,23 +3878,37 @@ EVALUATIONS_COMPARE_TEMPLATE = (
                 </div>
             </div>
             
+            <style>
+                .sticky-actions { position: sticky; right: 0; z-index: 10; }
+                .sticky-actions::before { content: ''; position: absolute; left: -8px; top: 0; bottom: 0; width: 8px; background: linear-gradient(to right, transparent, rgba(0,0,0,0.08)); pointer-events: none; }
+                thead .sticky-actions { background: #f9fafb; }
+                tbody tr .sticky-actions { background: #ffffff; }
+                tbody tr:hover .sticky-actions { background: #f9fafb; }
+                @media (prefers-color-scheme: dark) {
+                    .sticky-actions::before { background: linear-gradient(to right, transparent, rgba(0,0,0,0.4)); }
+                    thead .sticky-actions { background: #1f2937; }
+                    tbody tr .sticky-actions { background: #1f2937; }
+                    tbody tr:hover .sticky-actions { background: #374151; }
+                }
+            </style>
+            
             <!-- Filter Row -->
-            <div class="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
-                <div class="grid grid-cols-12 gap-2 text-xs">
-                    <div class="flex items-center justify-center">
+            <div class="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+                <div class="flex gap-2 text-xs min-w-max">
+                    <div class="w-10 flex items-center justify-center flex-shrink-0">
                         <input type="checkbox" id="select-all" class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" title="Select all">
                     </div>
-                    <div></div>
-                    <div><input type="text" id="filter-rouge" placeholder="ROUGE..." class="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"></div>
-                    <div><input type="text" id="filter-benchmark" placeholder="Benchmark..." class="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"></div>
-                    <div><input type="text" id="filter-model" placeholder="Model..." class="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"></div>
-                    <div><input type="text" id="filter-dataset" placeholder="Dataset..." class="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"></div>
-                    <div><input type="text" id="filter-lr" placeholder="LR..." class="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"></div>
-                    <div><input type="text" id="filter-epochs" placeholder="Epochs..." class="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"></div>
-                    <div><input type="text" id="filter-batch" placeholder="Batch..." class="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"></div>
-                    <div><input type="text" id="filter-lora" placeholder="LoRA..." class="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"></div>
-                    <div><input type="text" id="filter-started" placeholder="Started..." class="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"></div>
-                    <div></div>
+                    <div class="w-16 flex-shrink-0"></div>
+                    <div class="w-20 flex-shrink-0"><select id="filter-rouge" class="w-full px-1 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"><option value="">ROUGE</option></select></div>
+                    <div class="w-32 flex-shrink-0"><select id="filter-benchmark" class="w-full px-1 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"><option value="">Benchmark</option></select></div>
+                    <div class="w-36 flex-shrink-0"><select id="filter-model" class="w-full px-1 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"><option value="">Model</option></select></div>
+                    <div class="w-32 flex-shrink-0"><select id="filter-dataset" class="w-full px-1 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"><option value="">Dataset</option></select></div>
+                    <div class="w-20 flex-shrink-0"><select id="filter-lr" class="w-full px-1 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"><option value="">LR</option></select></div>
+                    <div class="w-20 flex-shrink-0"><select id="filter-epochs" class="w-full px-1 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"><option value="">Epochs</option></select></div>
+                    <div class="w-20 flex-shrink-0"><select id="filter-batch" class="w-full px-1 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"><option value="">Batch</option></select></div>
+                    <div class="w-24 flex-shrink-0"><select id="filter-lora" class="w-full px-1 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"><option value="">LoRA</option></select></div>
+                    <div class="w-28 flex-shrink-0"><select id="filter-started" class="w-full px-1 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"><option value="">Started</option></select></div>
+                    <div class="w-40 flex-shrink-0"></div>
                 </div>
             </div>
             
@@ -3890,7 +3927,7 @@ EVALUATIONS_COMPARE_TEMPLATE = (
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" data-sort="batch">Batch <span class="sort-icon"></span></th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" data-sort="lora">LoRA <span class="sort-icon"></span></th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" data-sort="started">Started <span class="sort-icon"></span></th>
-                            <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider sticky-actions">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100" id="eval-tbody">
@@ -3952,7 +3989,7 @@ EVALUATIONS_COMPARE_TEMPLATE = (
                             <td class="px-4 py-4">
                                 {% if eval.started_at %}<span class="text-sm text-gray-600 dark:text-gray-400" data-utc="{{ eval.started_at }}">{{ eval.started_at[:16].replace('T', ' ') }}</span>{% else %}<span class="text-sm text-gray-600 dark:text-gray-400">—</span>{% endif %}
                             </td>
-                            <td class="px-4 py-4 text-right whitespace-nowrap">
+                            <td class="px-4 py-4 text-right whitespace-nowrap sticky-actions">
                                 <a href="/experiments/{{ eval.experiment_id }}" class="text-sm font-medium text-purple-600 hover:text-purple-800 mr-3">Experiment</a>
                                 <a href="/evaluations/{{ eval.eval_id }}" class="text-sm font-medium text-primary-600 hover:text-primary-800 mr-3">Details</a>
                                 <form action="/evaluations/{{ eval.eval_id }}/delete" method="post" class="inline" onsubmit="return confirm('Delete this evaluation?')">
@@ -4007,7 +4044,7 @@ EVALUATIONS_COMPARE_TEMPLATE = (
             
             let currentSort = { col: 'rouge', dir: 'desc' };
             
-            // Filter inputs
+            // Filter dropdowns
             const filters = {
                 rouge: document.getElementById('filter-rouge'),
                 benchmark: document.getElementById('filter-benchmark'),
@@ -4019,6 +4056,38 @@ EVALUATIONS_COMPARE_TEMPLATE = (
                 lora: document.getElementById('filter-lora'),
                 started: document.getElementById('filter-started')
             };
+            
+            // Populate filter dropdowns with unique values from table
+            function populateFilterDropdowns() {
+                const rows = tbody.querySelectorAll('.eval-row');
+                const uniqueVals = {};
+                Object.keys(filters).forEach(key => uniqueVals[key] = new Set());
+                
+                rows.forEach(row => {
+                    Object.keys(filters).forEach(key => {
+                        const val = row.dataset[key] || '';
+                        if (val) uniqueVals[key].add(val);
+                    });
+                });
+                
+                Object.entries(filters).forEach(([key, select]) => {
+                    const placeholder = select.options[0].text;
+                    select.innerHTML = '<option value="">' + placeholder + '</option>';
+                    const sortedVals = [...uniqueVals[key]].sort((a, b) => {
+                        if (['rouge', 'lr', 'epochs', 'batch'].includes(key)) {
+                            return parseFloat(b) - parseFloat(a);
+                        }
+                        return a.localeCompare(b);
+                    });
+                    sortedVals.forEach(val => {
+                        const opt = document.createElement('option');
+                        opt.value = val;
+                        opt.textContent = key === 'started' ? val.split('T')[0] : val;
+                        select.appendChild(opt);
+                    });
+                });
+            }
+            populateFilterDropdowns();
             
             // Checkbox selection handling
             function updateSelectionUI() {
@@ -4066,12 +4135,12 @@ EVALUATIONS_COMPARE_TEMPLATE = (
                 
                 rows.forEach(row => {
                     let visible = true;
-                    for (const [key, input] of Object.entries(filters)) {
-                        const val = input.value.toLowerCase().trim();
+                    for (const [key, select] of Object.entries(filters)) {
+                        const val = select.value;
                         if (val) {
                             hasFilters = true;
-                            const cellVal = (row.dataset[key] || '').toLowerCase();
-                            if (!cellVal.includes(val)) {
+                            const cellVal = row.dataset[key] || '';
+                            if (cellVal !== val) {
                                 visible = false;
                                 break;
                             }
@@ -4134,9 +4203,9 @@ EVALUATIONS_COMPARE_TEMPLATE = (
                 });
             });
             
-            // Filter input handlers
-            Object.values(filters).forEach(input => {
-                input.addEventListener('input', applyFilters);
+            // Filter dropdown handlers
+            Object.values(filters).forEach(select => {
+                select.addEventListener('change', applyFilters);
             });
             
             // Clear filters
@@ -5762,6 +5831,7 @@ def start_benchmark_eval(benchmark_id: str):
         "max_new_tokens": int(form.get("max_new_tokens", 128)),
         "temperature": float(form.get("temperature", 0.7)),
         "top_p": float(form.get("top_p", 0.9)),
+        "num_runs": int(form.get("num_runs", 1)),
     }
     resp = requests.post(f"{API_BASE_URL}/benchmarks/{benchmark_id}/evaluate", json=payload, timeout=600)
     
