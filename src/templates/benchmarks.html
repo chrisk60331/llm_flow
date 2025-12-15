@@ -8,6 +8,14 @@
     <p class="text-gray-600 dark:text-gray-400">Create and manage evaluation benchmarks</p>
 </div>
 
+{% if error %}
+<div class="card mb-6">
+    <div class="card-body">
+        <div class="text-sm text-red-700 dark:text-red-300">{{ error }}</div>
+    </div>
+</div>
+{% endif %}
+
 <div class="card mb-6">
     <div class="card-header">
         <h2 class="font-semibold text-gray-800 dark:text-gray-200">Create New Benchmark</h2>
@@ -15,19 +23,99 @@
     <div class="card-body">
         <form action="/benchmarks/create" method="post" class="space-y-4">
             <div class="form-group">
+                <label class="form-label">Benchmark Type</label>
+                <select id="benchmark_type" name="benchmark_type" class="form-select" required>
+                    <option value="causal_lm_qa">Causal LM (Q&A)</option>
+                    <option value="masked_lm_fill_mask">Masked LM (Fill Mask)</option>
+                    <option value="custom_lightning_sin_regression">Custom Lightning (sin(x) regression)</option>
+                    <option value="custom_lightning_plugin">Custom Lightning (benchmark plugin)</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label class="form-label">Benchmark Name</label>
                 <input type="text" name="name" required class="form-input" placeholder="e.g., knowledge-test-1">
             </div>
-            <div class="form-group">
-                <label class="form-label">Question</label>
-                <textarea name="question" rows="3" required class="form-textarea" placeholder="What is the capital of France?"></textarea>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Gold Answer</label>
-                <textarea name="gold_answer" rows="3" required class="form-textarea" placeholder="The capital of France is Paris."></textarea>
+            <div id="qa_section" class="space-y-4">
+                <div class="form-group">
+                    <label class="form-label">Question</label>
+                    <textarea id="question" name="question" rows="3" class="form-textarea" placeholder="What is the capital of France?"></textarea>
+                    <p id="question_help" class="text-xs text-gray-500 mt-1"></p>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Gold Answer</label>
+                    <textarea id="gold_answer" name="gold_answer" rows="3" class="form-textarea" placeholder="The capital of France is Paris."></textarea>
+                </div>
             </div>
             
-            <div class="section-card">
+            <div id="spec_section" class="section-card hidden">
+                <div class="section-header">
+                    <h3 class="section-title">Spec (JSON)</h3>
+                </div>
+                <div class="section-body">
+                    <!-- Hidden field submitted to backend -->
+                    <textarea id="spec_json" name="spec_json" class="hidden" spellcheck="false"></textarea>
+
+                    <div id="spec_sin_builder" class="hidden space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">x_min</label>
+                                <input id="sin_x_min" type="number" step="0.0001" class="form-input" value="0.0" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">x_max</label>
+                                <input id="sin_x_max" type="number" step="0.0001" class="form-input" value="1.0" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">n_points</label>
+                                <input id="sin_n_points" type="number" min="2" class="form-input" value="1000" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="spec_plugin_builder" class="hidden space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Benchmark plugin</label>
+                                <select id="bm_plugin_id" class="form-select">
+                                    <option value="">Select a benchmark plugin...</option>
+                                    {% for p in (benchmark_plugins or []) %}
+                                    <option value="{{ p.id }}">{{ p.name }} ({{ p.id[:8] }}...)</option>
+                                    {% endfor %}
+                                </select>
+                                {% if not (benchmark_plugins or []) %}
+                                <p class="text-xs text-amber-600 mt-2">No benchmark plugins uploaded yet. Upload one in Plugins.</p>
+                                {% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Function</label>
+                                <input id="bm_function_name" type="text" class="form-input" value="run_benchmark" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">x_min</label>
+                                <input id="bm_x_min" type="number" step="0.0001" class="form-input" value="0.0" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">x_max</label>
+                                <input id="bm_x_max" type="number" step="0.0001" class="form-input" value="1.0" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">n_points</label>
+                                <input id="bm_n_points" type="number" min="2" class="form-input" value="100" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Spec (generated)</label>
+                        <pre id="spec_pretty" class="text-xs text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 p-3 rounded overflow-x-auto"></pre>
+                        <p id="spec_help" class="text-xs text-gray-500 mt-2"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="inference_section" class="section-card">
                 <div class="section-header">
                     <h3 class="section-title">Inference Settings</h3>
                 </div>
@@ -57,12 +145,157 @@
     </div>
 </div>
 
+<script>
+  const typeSelect = document.getElementById('benchmark_type');
+  const qaSection = document.getElementById('qa_section');
+  const question = document.getElementById('question');
+  const gold = document.getElementById('gold_answer');
+  const specSection = document.getElementById('spec_section');
+  const specJson = document.getElementById('spec_json');
+  const specPretty = document.getElementById('spec_pretty');
+  const specHelp = document.getElementById('spec_help');
+  const sinBuilder = document.getElementById('spec_sin_builder');
+  const pluginBuilder = document.getElementById('spec_plugin_builder');
+  const inferenceSection = document.getElementById('inference_section');
+  const questionHelp = document.getElementById('question_help');
+
+  const maxNewTokensInput = document.querySelector('input[name="max_new_tokens"]');
+  const temperatureInput = document.querySelector('input[name="temperature"]');
+  const topPInput = document.querySelector('input[name="top_p"]');
+
+  const sinXMin = document.getElementById('sin_x_min');
+  const sinXMax = document.getElementById('sin_x_max');
+  const sinNPoints = document.getElementById('sin_n_points');
+
+  const bmPluginId = document.getElementById('bm_plugin_id');
+  const bmFunctionName = document.getElementById('bm_function_name');
+  const bmXMin = document.getElementById('bm_x_min');
+  const bmXMax = document.getElementById('bm_x_max');
+  const bmNPoints = document.getElementById('bm_n_points');
+
+  function setSpec(obj) {
+    specJson.value = JSON.stringify(obj);
+    specPretty.textContent = JSON.stringify(obj, null, 2);
+  }
+
+  function buildSinSpec() {
+    return {
+      task: "sin",
+      x_min: parseFloat(document.getElementById('sin_x_min').value),
+      x_max: parseFloat(document.getElementById('sin_x_max').value),
+      n_points: parseInt(document.getElementById('sin_n_points').value, 10),
+    };
+  }
+
+  function buildPluginSpec() {
+    return {
+      benchmark_plugin_id: document.getElementById('bm_plugin_id').value,
+      benchmark_function_name: document.getElementById('bm_function_name').value,
+      x_min: parseFloat(document.getElementById('bm_x_min').value),
+      x_max: parseFloat(document.getElementById('bm_x_max').value),
+      n_points: parseInt(document.getElementById('bm_n_points').value, 10),
+    };
+  }
+
+  function wire(ids, builder) {
+    ids.forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', () => setSpec(builder()));
+      el.addEventListener('change', () => setSpec(builder()));
+    });
+  }
+
+  function applyTypeUI() {
+    const t = typeSelect.value;
+    specSection.classList.add('hidden');
+    inferenceSection.classList.remove('hidden');
+    qaSection.classList.remove('hidden');
+    sinBuilder.classList.add('hidden');
+    pluginBuilder.classList.add('hidden');
+    question.required = true;
+    gold.required = true;
+    questionHelp.textContent = '';
+    specHelp.textContent = '';
+
+    // IMPORTANT: disable/clear validation for hidden spec-builder controls so they
+    // can't block form submission when you switch benchmark types.
+    if (sinXMin) sinXMin.disabled = true;
+    if (sinXMax) sinXMax.disabled = true;
+    if (sinNPoints) sinNPoints.disabled = true;
+
+    if (bmPluginId) {
+      bmPluginId.required = false;
+      bmPluginId.disabled = true;
+    }
+    if (bmFunctionName) bmFunctionName.disabled = true;
+    if (bmXMin) bmXMin.disabled = true;
+    if (bmXMax) bmXMax.disabled = true;
+    if (bmNPoints) bmNPoints.disabled = true;
+
+    // Disable inference fields by default; enable only for causal_lm_qa
+    if (maxNewTokensInput) maxNewTokensInput.disabled = true;
+    if (temperatureInput) temperatureInput.disabled = true;
+    if (topPInput) topPInput.disabled = true;
+
+    if (t === 'causal_lm_qa') {
+      inferenceSection.classList.remove('hidden');
+      if (maxNewTokensInput) maxNewTokensInput.disabled = false;
+      if (temperatureInput) temperatureInput.disabled = false;
+      if (topPInput) topPInput.disabled = false;
+      question.placeholder = 'What is the capital of France?';
+      return;
+    }
+    if (t === 'masked_lm_fill_mask') {
+      inferenceSection.classList.add('hidden');
+      question.placeholder = 'The capital of France is [MASK].';
+      questionHelp.textContent = 'Include exactly one mask token: [MASK] (or <mask>)';
+      return;
+    }
+    // custom lightning benchmarks
+    inferenceSection.classList.add('hidden');
+    specSection.classList.remove('hidden');
+    qaSection.classList.add('hidden');
+    question.required = false;
+    gold.required = false;
+    question.placeholder = '';
+    gold.placeholder = '';
+    if (t === 'custom_lightning_sin_regression') {
+      sinBuilder.classList.remove('hidden');
+      if (sinXMin) sinXMin.disabled = false;
+      if (sinXMax) sinXMax.disabled = false;
+      if (sinNPoints) sinNPoints.disabled = false;
+      setSpec(buildSinSpec());
+      specHelp.textContent = 'Evaluates MSE against sin(x) on a fixed grid.';
+      return;
+    }
+    // custom_lightning_plugin
+    pluginBuilder.classList.remove('hidden');
+    if (bmPluginId) {
+      bmPluginId.disabled = false;
+      bmPluginId.required = true;
+    }
+    if (bmFunctionName) bmFunctionName.disabled = false;
+    if (bmXMin) bmXMin.disabled = false;
+    if (bmXMax) bmXMax.disabled = false;
+    if (bmNPoints) bmNPoints.disabled = false;
+    setSpec(buildPluginSpec());
+    specHelp.textContent = 'Runs your uploaded benchmark plugin and stores primary_score + metrics.';
+  }
+
+  typeSelect.addEventListener('change', applyTypeUI);
+  wire(['sin_x_min','sin_x_max','sin_n_points'], buildSinSpec);
+  wire(['bm_plugin_id','bm_function_name','bm_x_min','bm_x_max','bm_n_points'], buildPluginSpec);
+  applyTypeUI();
+</script>
+
 <div class="card">
     <div class="overflow-x-auto">
         <table class="w-full">
             <thead>
                 <tr class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Type</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Question</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Gold Answer</th>
                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Inference Settings</th>
@@ -74,6 +307,7 @@
                 {% for bm in benchmarks %}
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors">
                     <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">{{ bm.name }}</td>
+                    <td class="px-6 py-4 text-xs font-mono text-gray-600 dark:text-gray-400">{{ bm.benchmark_type }}</td>
                     <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ bm.question | truncate(50) }}</td>
                     <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ bm.gold_answer | truncate(50) }}</td>
                     <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
@@ -97,7 +331,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                         <div class="flex flex-col items-center">
                             <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                             <p>No benchmarks created yet</p>

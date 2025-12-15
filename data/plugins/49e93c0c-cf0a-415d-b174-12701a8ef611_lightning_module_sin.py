@@ -18,6 +18,11 @@ class SinRegressor(L.LightningModule):
             nn.Linear(hidden_dim, 1),
         )
 
+    @property
+    def model(self) -> nn.Module:
+        # Expose a stable attribute name for benchmarks: lightning_module.model(x)
+        return self.net
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
 

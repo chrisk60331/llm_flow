@@ -25,6 +25,7 @@ from ..llm_training import run_llm_training
 from ..models import (
     BenchmarkEvalResult,
     BenchmarkStatus,
+    BenchmarkType,
     CausalLMFullConfig,
     CausalLMRequest,
     ConfigRecord,
@@ -71,6 +72,24 @@ def _run_all_benchmarks_for_experiment(experiment_id: str) -> None:
         return
     
     experiment = get_experiment(experiment_id)
+    if not experiment:
+        return
+
+    if experiment.experiment_type == ExperimentType.CAUSAL_LM:
+        benchmarks = [b for b in benchmarks if b.benchmark_type == BenchmarkType.CAUSAL_LM_QA]
+    elif experiment.experiment_type == ExperimentType.MASKED_LM:
+        benchmarks = [b for b in benchmarks if b.benchmark_type == BenchmarkType.MASKED_LM_FILL_MASK]
+    elif experiment.experiment_type == ExperimentType.CUSTOM_LIGHTNING:
+        benchmarks = [
+            b
+            for b in benchmarks
+            if b.benchmark_type
+            in {BenchmarkType.CUSTOM_LIGHTNING_SIN_REGRESSION, BenchmarkType.CUSTOM_LIGHTNING_PLUGIN}
+        ]
+    else:
+        benchmarks = []
+    if not benchmarks:
+        return
     
     experiment.status = ExperimentStatus.EVALUATING
     experiment.auto_eval_total = len(benchmarks)
@@ -87,12 +106,15 @@ def _run_all_benchmarks_for_experiment(experiment_id: str) -> None:
             id=eval_id,
             benchmark_id=benchmark.id,
             benchmark_name=benchmark.name,
+            benchmark_type=benchmark.benchmark_type,
             experiment_id=experiment_id,
             question=benchmark.question,
             gold_answer=benchmark.gold_answer,
             model_answer="",
             bleu_score=0.0,
             rouge_score=0.0,
+            primary_score=0.0,
+            metrics={},
             status=BenchmarkStatus.PENDING,
             started_at=now(),
         )

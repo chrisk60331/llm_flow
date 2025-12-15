@@ -49,35 +49,61 @@
     </div>
 </div>
 
-<!-- ROUGE Score -->
 {% if evaluation.status == 'completed' %}
-<div class="metric-card mb-6 text-center py-8">
-    <p class="metric-label mb-2">ROUGE-L Score</p>
-    <p class="text-5xl font-bold {% if evaluation.rouge_score > 50 %}text-emerald-600{% elif evaluation.rouge_score > 20 %}text-amber-600{% else %}text-red-600{% endif %}">{{ "%.2f"|format(evaluation.rouge_score) }}</p>
-</div>
+    {% if evaluation.benchmark_type == 'custom_lightning_sin_regression' %}
+    <div class="metric-card mb-6 text-center py-8">
+        <p class="metric-label mb-2">MSE (lower is better)</p>
+        <p class="text-5xl font-bold text-emerald-600">{{ "%.6f"|format(evaluation.primary_score) }}</p>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2 font-mono">
+            mae={{ evaluation.metrics.get('mae') }} rmse={{ evaluation.metrics.get('rmse') }}
+        </p>
+    </div>
+    {% elif evaluation.benchmark_type == 'custom_lightning_plugin' %}
+    <div class="metric-card mb-6 text-center py-8">
+        <p class="metric-label mb-2">Primary score</p>
+        <p class="text-5xl font-bold text-emerald-600">{{ "%.6f"|format(evaluation.primary_score) }}</p>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2 font-mono">
+            {{ (evaluation.metrics or {}) | tojson }}
+        </p>
+    </div>
+    {% elif evaluation.benchmark_type == 'masked_lm_fill_mask' %}
+    <div class="metric-card mb-6 text-center py-8">
+        <p class="metric-label mb-2">Top-1 Correct</p>
+        <p class="text-5xl font-bold {% if evaluation.primary_score >= 1 %}text-emerald-600{% else %}text-red-600{% endif %}">{{ "%.0f"|format(evaluation.primary_score) }}</p>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2 font-mono">
+            top1={{ evaluation.metrics.get('top1') }} gold={{ evaluation.metrics.get('gold') }}
+        </p>
+    </div>
+    {% else %}
+    <div class="metric-card mb-6 text-center py-8">
+        <p class="metric-label mb-2">ROUGE-L Score</p>
+        <p class="text-5xl font-bold {% if evaluation.rouge_score > 50 %}text-emerald-600{% elif evaluation.rouge_score > 20 %}text-amber-600{% else %}text-red-600{% endif %}">{{ "%.2f"|format(evaluation.rouge_score) }}</p>
+    </div>
+    {% endif %}
 {% endif %}
 
-<!-- Q&A Comparison -->
+{% if evaluation.benchmark_type == 'causal_lm_qa' or evaluation.benchmark_type == 'masked_lm_fill_mask' %}
 <div class="card">
     <div class="card-header">
-        <h2 class="font-semibold text-gray-800 dark:text-gray-200">Question & Answer Comparison</h2>
+        <h2 class="font-semibold text-gray-800 dark:text-gray-200">Prompt & Output</h2>
     </div>
     <div class="card-body space-y-4">
         <div>
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Question</p>
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Prompt</p>
             <p class="text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">{{ evaluation.question }}</p>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-                <p class="text-xs font-medium text-emerald-600 uppercase mb-1">Gold Answer</p>
+                <p class="text-xs font-medium text-emerald-600 uppercase mb-1">Gold</p>
                 <p class="text-sm text-gray-900 dark:text-gray-100 bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded-lg border border-emerald-200 dark:border-emerald-800 min-h-24">{{ evaluation.gold_answer }}</p>
             </div>
             <div>
-                <p class="text-xs font-medium text-blue-600 uppercase mb-1">Model Answer</p>
+                <p class="text-xs font-medium text-blue-600 uppercase mb-1">Model Output</p>
                 <p class="text-sm text-gray-900 dark:text-gray-100 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800 min-h-24">{{ evaluation.model_answer or 'Pending...' }}</p>
             </div>
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}
 

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 class PluginKind(str, Enum):
     LIGHTNING_MODULE = "lightning_module"
     DATALOADERS = "dataloaders"
+    BENCHMARK = "benchmark"
 
 
 class PluginRecord(BaseModel):

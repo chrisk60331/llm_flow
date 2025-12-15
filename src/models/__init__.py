@@ -42,7 +42,7 @@ from .config import (
     MaskedLMTrainingConfig,
 )
 from .dataset import DatasetInfo, DatasetListResponse
-from .enums import AutoTuneStatus, BenchmarkStatus, ExperimentStatus, ExperimentType
+from .enums import AutoTuneStatus, BenchmarkStatus, BenchmarkType, ExperimentStatus, ExperimentType
 from .experiment import (
     ExperimentComparisonItem,
     ExperimentComparisonResponse,
@@ -61,6 +61,7 @@ __all__ = [
     # Enums
     "AutoTuneStatus",
     "BenchmarkStatus",
+    "BenchmarkType",
     "ExperimentStatus",
     "ExperimentType",
     # Dataset

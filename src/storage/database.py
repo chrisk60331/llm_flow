@@ -145,6 +145,8 @@ def init_db() -> None:
     _migrate_experiments_add_custom_lightning_fields()
     _migrate_benchmark_evals_add_rouge()
     _migrate_benchmarks_add_inference_settings()
+    _migrate_benchmarks_add_type_and_spec()
+    _migrate_benchmark_evals_add_type_and_metrics()
     _scan_existing_uploads()
     _scan_existing_plugins()
 
@@ -341,6 +343,50 @@ def _migrate_benchmarks_add_inference_settings() -> None:
         conn.commit()
 
 
+def _migrate_benchmarks_add_type_and_spec() -> None:
+    """Add benchmark_type + spec_json columns to benchmarks if they don't exist."""
+    with get_connection() as conn:
+        cursor = conn.execute("PRAGMA table_info(benchmarks)")
+        columns = {row["name"] for row in cursor.fetchall()}
+        if "benchmark_type" not in columns:
+            conn.execute(
+                "ALTER TABLE benchmarks ADD COLUMN benchmark_type TEXT NOT NULL DEFAULT 'causal_lm_qa'"
+            )
+        if "spec_json" not in columns:
+            conn.execute(
+                "ALTER TABLE benchmarks ADD COLUMN spec_json TEXT NOT NULL DEFAULT '{}'"
+            )
+        conn.commit()
+
+
+def _migrate_benchmark_evals_add_type_and_metrics() -> None:
+    """Add benchmark_type + generic numeric metrics columns to benchmark_evals if missing."""
+    with get_connection() as conn:
+        cursor = conn.execute("PRAGMA table_info(benchmark_evals)")
+        columns = {row["name"] for row in cursor.fetchall()}
+        if "benchmark_type" not in columns:
+            conn.execute(
+                "ALTER TABLE benchmark_evals ADD COLUMN benchmark_type TEXT NOT NULL DEFAULT 'causal_lm_qa'"
+            )
+        if "primary_score" not in columns:
+            conn.execute(
+                "ALTER TABLE benchmark_evals ADD COLUMN primary_score REAL NOT NULL DEFAULT 0.0"
+            )
+        if "metrics_json" not in columns:
+            conn.execute(
+                "ALTER TABLE benchmark_evals ADD COLUMN metrics_json TEXT NOT NULL DEFAULT '{}'"
+            )
+        if "num_runs" not in columns:
+            conn.execute(
+                "ALTER TABLE benchmark_evals ADD COLUMN num_runs INTEGER NOT NULL DEFAULT 1"
+            )
+        if "run_scores_json" not in columns:
+            conn.execute(
+                "ALTER TABLE benchmark_evals ADD COLUMN run_scores_json TEXT NOT NULL DEFAULT '[]'"
+            )
+        conn.commit()
+
+
 def _scan_existing_uploads() -> None:
     """Scan data/uploads for CSV files and add missing ones to the database."""
     # Import here to avoid circular import
@@ -387,7 +433,7 @@ def _scan_existing_plugins() -> None:
         if len(parts) != 3:
             continue
         plugin_id, kind_str, original = parts
-        if kind_str not in {"lightning_module", "dataloaders"}:
+        if kind_str not in {"lightning_module", "dataloaders", "benchmark"}:
             continue
 
         try:

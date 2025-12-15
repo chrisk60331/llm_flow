@@ -6,7 +6,7 @@
 <div class="max-w-2xl mx-auto">
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Evaluate Benchmark</h1>
-        <p class="text-gray-600 dark:text-gray-400">{{ benchmark.name }}: {{ benchmark.question | truncate(80) }}</p>
+    <p class="text-gray-600 dark:text-gray-400">{{ benchmark.name }} ({{ benchmark.benchmark_type }})</p>
     </div>
     
     <div class="card">
@@ -19,11 +19,15 @@
                 <select id="experiment-select" class="form-select" required>
                     <option value="">Select a completed experiment...</option>
                     {% for exp in experiments %}
-                    <option value="{{ exp.id }}">{{ exp.config.model.pretrained_model_name | truncate(40) }} ({{ exp.id[:8] }}...)</option>
+                    {% if exp.experiment_type == 'custom_lightning' %}
+                    <option value="{{ exp.id }}">{{ exp.lightning_module_class_name | default('custom_lightning') }} ({{ exp.id[:8] }}...)</option>
+                    {% else %}
+                    <option value="{{ exp.id }}">{{ exp.config.model.pretrained_model_name | default('model') | truncate(40) }} ({{ exp.id[:8] }}...)</option>
+                    {% endif %}
                     {% endfor %}
                 </select>
                 {% if not experiments %}
-                <p class="text-sm text-amber-600 mt-2">No completed Causal LM experiments available. Train a model first.</p>
+                <p class="text-sm text-amber-600 mt-2">No completed compatible experiments available. Train a model first.</p>
                 {% endif %}
             </div>
             
@@ -32,17 +36,25 @@
                     <h3 class="section-title">Benchmark Details</h3>
                 </div>
                 <div class="section-body space-y-3">
-                    <div>
-                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Question</p>
-                        <p class="text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 p-3 rounded">{{ benchmark.question }}</p>
-                    </div>
-                    <div>
-                        <p class="text-xs font-medium text-emerald-600 uppercase mb-1">Gold Answer</p>
-                        <p class="text-sm text-gray-900 dark:text-gray-100 bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded border border-emerald-200 dark:border-emerald-800">{{ benchmark.gold_answer }}</p>
-                    </div>
+                    {% if benchmark.benchmark_type != 'custom_lightning_sin_regression' and benchmark.benchmark_type != 'custom_lightning_plugin' %}
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Question</p>
+                            <p class="text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 p-3 rounded">{{ benchmark.question }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-medium text-emerald-600 uppercase mb-1">Gold Answer</p>
+                            <p class="text-sm text-gray-900 dark:text-gray-100 bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded border border-emerald-200 dark:border-emerald-800">{{ benchmark.gold_answer }}</p>
+                        </div>
+                    {% else %}
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Spec</p>
+                            <pre class="text-xs text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 p-3 rounded overflow-x-auto">{{ (benchmark.spec or {}) | tojson(indent=2) }}</pre>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
             
+            {% if benchmark.benchmark_type == 'causal_lm_qa' %}
             <div class="section-card mb-6">
                 <div class="section-header">
                     <h3 class="section-title">Inference Settings</h3>
@@ -68,6 +80,7 @@
                     </p>
                 </div>
             </div>
+            {% endif %}
             
             <div class="flex justify-end gap-3">
                 <a href="/benchmarks" class="px-4 py-2 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">Cancel</a>
@@ -118,6 +131,19 @@
                     </div>
                 </div>
             </div>
+
+            <div id="eval-result-noncausal" class="hidden">
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="metric-card text-center">
+                        <p class="metric-label mb-1" id="primary-label">Primary</p>
+                        <p id="primary-value" class="text-2xl font-bold text-emerald-600">--</p>
+                    </div>
+                    <div class="metric-card text-center">
+                        <p class="metric-label mb-1">Details</p>
+                        <p id="secondary-value" class="text-sm font-mono text-gray-700 dark:text-gray-200">--</p>
+                    </div>
+                </div>
+            </div>
             
             <!-- Error Display -->
             <div id="eval-error" class="hidden mt-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
@@ -137,6 +163,7 @@
 {% block scripts %}
 <script>
     const benchmarkId = "{{ benchmark.id }}";
+    const benchmarkType = "{{ benchmark.benchmark_type }}";
     let evalPollingInterval = null;
     let currentEvalId = null;
     
@@ -164,6 +191,7 @@
         
         // Reset and show modal
         document.getElementById('eval-result').classList.add('hidden');
+        document.getElementById('eval-result-noncausal').classList.add('hidden');
         document.getElementById('eval-error').classList.add('hidden');
         document.getElementById('eval-close-btn').classList.add('hidden');
         document.getElementById('eval-view-btn').classList.add('hidden');
@@ -248,22 +276,49 @@
         document.getElementById('eval-status').textContent = 'Status: Completed';
         
         // Show results
-        document.getElementById('eval-bleu').textContent = data.bleu_score.toFixed(2);
-        document.getElementById('eval-rouge').textContent = data.rouge_score.toFixed(2);
-        document.getElementById('eval-answer').textContent = data.model_answer || 'No answer generated';
-        
-        // Color the ROUGE score
-        const rougeEl = document.getElementById('eval-rouge');
-        rougeEl.classList.remove('text-emerald-600', 'text-amber-600', 'text-red-600');
-        if (data.rouge_score > 50) {
-            rougeEl.classList.add('text-emerald-600');
-        } else if (data.rouge_score > 20) {
-            rougeEl.classList.add('text-amber-600');
+        document.getElementById('eval-result').classList.add('hidden');
+        document.getElementById('eval-result-noncausal').classList.add('hidden');
+
+        if (benchmarkType === 'causal_lm_qa') {
+            document.getElementById('eval-bleu').textContent = data.bleu_score.toFixed(2);
+            document.getElementById('eval-rouge').textContent = data.rouge_score.toFixed(2);
+            document.getElementById('eval-answer').textContent = data.model_answer || 'No answer generated';
+
+            const rougeEl = document.getElementById('eval-rouge');
+            rougeEl.classList.remove('text-emerald-600', 'text-amber-600', 'text-red-600');
+            if (data.rouge_score > 50) rougeEl.classList.add('text-emerald-600');
+            else if (data.rouge_score > 20) rougeEl.classList.add('text-amber-600');
+            else rougeEl.classList.add('text-red-600');
+
+            document.getElementById('eval-result').classList.remove('hidden');
+        } else if (benchmarkType === 'custom_lightning_sin_regression') {
+            document.getElementById('primary-label').textContent = 'MSE (lower is better)';
+            document.getElementById('primary-value').textContent = (data.primary_score || 0).toFixed(6);
+            const mae = (data.metrics && data.metrics.mae) ? data.metrics.mae : '--';
+            const rmse = (data.metrics && data.metrics.rmse) ? data.metrics.rmse : '--';
+            document.getElementById('secondary-value').textContent = 'mae=' + mae + ' rmse=' + rmse;
+            document.getElementById('eval-result-noncausal').classList.remove('hidden');
+        } else if (benchmarkType === 'custom_lightning_plugin') {
+            document.getElementById('primary-label').textContent = 'Primary score';
+            document.getElementById('primary-value').textContent = (data.primary_score || 0).toFixed(6);
+            const m = (data.metrics && typeof data.metrics === 'object') ? data.metrics : {};
+            const keys = Object.keys(m);
+            const parts = [];
+            if (typeof m.mse === 'number') parts.push('mse=' + m.mse.toFixed(6));
+            if (typeof m.mae === 'number') parts.push('mae=' + m.mae.toFixed(6));
+            if (parts.length === 0) parts.push('metrics_keys=' + keys.join(','));
+            document.getElementById('secondary-value').textContent = parts.join(' ');
+            document.getElementById('eval-result-noncausal').classList.remove('hidden');
         } else {
-            rougeEl.classList.add('text-red-600');
+            // masked_lm_fill_mask
+            document.getElementById('primary-label').textContent = 'Top-1 correct (1/0)';
+            document.getElementById('primary-value').textContent = (data.primary_score || 0).toFixed(0);
+            const top1 = (data.metrics && data.metrics.top1) ? data.metrics.top1 : '--';
+            const gold = (data.metrics && data.metrics.gold) ? data.metrics.gold : '--';
+            document.getElementById('secondary-value').textContent = 'top1=' + top1 + ' gold=' + gold;
+            document.getElementById('eval-result-noncausal').classList.remove('hidden');
         }
-        
-        document.getElementById('eval-result').classList.remove('hidden');
+
         document.getElementById('eval-close-btn').classList.remove('hidden');
         document.getElementById('eval-view-btn').classList.remove('hidden');
         document.getElementById('eval-view-btn').href = '/evaluations/' + currentEvalId;

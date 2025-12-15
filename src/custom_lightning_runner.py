@@ -172,6 +172,10 @@ def _run(payload: RunnerPayload) -> dict[str, Any]:
 
     trainer.fit(model=module, train_dataloaders=dls["train"], val_dataloaders=dls.get("val"))
 
+    # Persist a checkpoint for downstream evaluation (benchmarks, analysis).
+    ckpt_path = output_dir / "model.ckpt"
+    trainer.save_checkpoint(str(ckpt_path))
+
     metrics: dict[str, Any] = {}
     if dls.get("val") is not None:
         out = trainer.validate(model=module, dataloaders=dls["val"], verbose=False)

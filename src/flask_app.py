@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import json
+from urllib.parse import quote
 from pathlib import Path
 
 import requests
@@ -607,14 +608,32 @@ def extract_meta_features(experiment_id: str):
 def benchmarks_page():
     resp = requests.get(f"{API_BASE_URL}/benchmarks", timeout=10)
     data = resp.json()
-    return render_template("benchmarks.html", benchmarks=data.get("benchmarks", []))
+    plugins_resp = requests.get(f"{API_BASE_URL}/plugins", timeout=10)
+    plugins = plugins_resp.json().get("plugins", []) if plugins_resp.status_code == 200 else []
+    benchmark_plugins = [p for p in plugins if p.get("kind") == "benchmark"]
+    err = request.args.get("error")
+    return render_template(
+        "benchmarks.html",
+        benchmarks=data.get("benchmarks", []),
+        benchmark_plugins=benchmark_plugins,
+        error=err,
+    )
 
 
 @app.route("/benchmarks/create", methods=["POST"])
 def create_benchmark():
     form = request.form.to_dict()
+    benchmark_type = form.get("benchmark_type", "causal_lm_qa")
+    spec_blob = {}
+    if benchmark_type in {"custom_lightning_sin_regression", "custom_lightning_plugin"}:
+        try:
+            spec_blob = json.loads(form.get("spec_json", ""))
+        except Exception:
+            spec_blob = {}
     payload = {
         "name": form.get("name", "").strip() or None,
+        "benchmark_type": benchmark_type,
+        "spec": spec_blob,
         "question": form.get("question", ""),
         "gold_answer": form.get("gold_answer", ""),
         "max_new_tokens": int(form.get("max_new_tokens", 128)),
@@ -624,7 +643,14 @@ def create_benchmark():
     resp = requests.post(f"{API_BASE_URL}/benchmarks", json=payload, timeout=10)
     if resp.status_code == 200:
         return redirect(url_for("benchmarks_page"))
-    return redirect(url_for("benchmarks_page"))
+    msg = "Failed to create benchmark"
+    try:
+        body = resp.json()
+        if isinstance(body, dict) and body.get("detail"):
+            msg = str(body.get("detail"))
+    except Exception:
+        pass
+    return redirect(url_for("benchmarks_page", error=quote(msg, safe="")))
 
 
 @app.route("/benchmarks/<benchmark_id>/edit", methods=["GET", "POST"])
@@ -636,16 +662,32 @@ def edit_benchmark(benchmark_id: str):
         return render_template("benchmark_edit.html", benchmark=resp.json())
     
     form = request.form.to_dict()
+    spec_blob = None
+    if form.get("spec_json"):
+        try:
+            spec_blob = json.loads(form.get("spec_json", ""))
+        except Exception:
+            spec_blob = None
     payload = {
         "name": form.get("name", "").strip() or None,
         "question": form.get("question", ""),
         "gold_answer": form.get("gold_answer", ""),
+        "spec": spec_blob,
         "max_new_tokens": int(form.get("max_new_tokens", 128)),
         "temperature": float(form.get("temperature", 0.7)),
         "top_p": float(form.get("top_p", 0.9)),
     }
-    requests.put(f"{API_BASE_URL}/benchmarks/{benchmark_id}", json=payload, timeout=10)
-    return redirect(url_for("benchmarks_page"))
+    resp = requests.put(f"{API_BASE_URL}/benchmarks/{benchmark_id}", json=payload, timeout=10)
+    if resp.status_code == 200:
+        return redirect(url_for("benchmarks_page"))
+    msg = "Failed to update benchmark"
+    try:
+        body = resp.json()
+        if isinstance(body, dict) and body.get("detail"):
+            msg = str(body.get("detail"))
+    except Exception:
+        pass
+    return redirect(url_for("benchmarks_page", error=quote(msg, safe="")))
 
 
 @app.route("/benchmarks/<benchmark_id>/delete", methods=["POST"])
@@ -663,10 +705,23 @@ def benchmark_evaluate_form(benchmark_id: str):
     benchmark_resp = requests.get(f"{API_BASE_URL}/benchmarks/{benchmark_id}", timeout=10)
     if benchmark_resp.status_code != 200:
         return redirect(url_for("benchmarks_page"))
+    benchmark = benchmark_resp.json()
     experiments_resp = requests.get(f"{API_BASE_URL}/experiments", timeout=10)
     experiments = experiments_resp.json().get("experiments", []) if experiments_resp.status_code == 200 else []
-    completed_experiments = [e for e in experiments if e.get("status") == "completed" and e.get("experiment_type") == "causal_lm"]
-    return render_template("benchmark_evaluate.html", benchmark=benchmark_resp.json(), experiments=completed_experiments)
+    bt = benchmark.get("benchmark_type", "causal_lm_qa")
+    if bt == "causal_lm_qa":
+        target_type = "causal_lm"
+    elif bt == "masked_lm_fill_mask":
+        target_type = "masked_lm"
+    elif bt in {"custom_lightning_sin_regression", "custom_lightning_plugin"}:
+        target_type = "custom_lightning"
+    else:
+        target_type = "causal_lm"
+
+    completed_experiments = [
+        e for e in experiments if e.get("status") == "completed" and e.get("experiment_type") == target_type
+    ]
+    return render_template("benchmark_evaluate.html", benchmark=benchmark, experiments=completed_experiments)
 
 
 @app.route("/benchmarks/<benchmark_id>/evaluate", methods=["POST"])

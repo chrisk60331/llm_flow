@@ -7,7 +7,7 @@
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ benchmark.name }}</h1>
-            <p class="text-gray-600 dark:text-gray-400">{{ benchmark.question | truncate(100) }}</p>
+            <p class="text-gray-600 dark:text-gray-400">{{ benchmark.benchmark_type }}</p>
         </div>
         <a href="/benchmarks" class="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">&larr; Back to Benchmarks</a>
     </div>
@@ -16,22 +16,31 @@
 <!-- Benchmark Info -->
 <div class="section-card mb-6">
     <div class="section-body space-y-3">
-        <div>
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Question</p>
-            <p class="text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 p-3 rounded">{{ benchmark.question }}</p>
-        </div>
-        <div>
-            <p class="text-xs font-medium text-emerald-600 uppercase mb-1">Gold Answer</p>
-            <p class="text-sm text-gray-900 dark:text-gray-100 bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded border border-emerald-200 dark:border-emerald-800">{{ benchmark.gold_answer }}</p>
-        </div>
-        <div>
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Inference Settings</p>
-            <div class="flex gap-4 text-sm text-gray-600 dark:text-gray-400">
-                <span><span class="text-gray-400">Max Tokens:</span> {{ benchmark.max_new_tokens }}</span>
-                <span><span class="text-gray-400">Temperature:</span> {{ benchmark.temperature }}</span>
-                <span><span class="text-gray-400">Top-P:</span> {{ benchmark.top_p }}</span>
+        {% if benchmark.benchmark_type == 'custom_lightning_sin_regression' or benchmark.benchmark_type == 'custom_lightning_plugin' %}
+            <div>
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Spec</p>
+                <pre class="text-xs text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 p-3 rounded overflow-x-auto">{{ (benchmark.spec or {}) | tojson(indent=2) }}</pre>
             </div>
-        </div>
+        {% else %}
+            <div>
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Question</p>
+                <p class="text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 p-3 rounded">{{ benchmark.question }}</p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-emerald-600 uppercase mb-1">Gold Answer</p>
+                <p class="text-sm text-gray-900 dark:text-gray-100 bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded border border-emerald-200 dark:border-emerald-800">{{ benchmark.gold_answer }}</p>
+            </div>
+        {% endif %}
+        {% if benchmark.benchmark_type == 'causal_lm_qa' %}
+            <div>
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Inference Settings</p>
+                <div class="flex gap-4 text-sm text-gray-600 dark:text-gray-400">
+                    <span><span class="text-gray-400">Max Tokens:</span> {{ benchmark.max_new_tokens }}</span>
+                    <span><span class="text-gray-400">Temperature:</span> {{ benchmark.temperature }}</span>
+                    <span><span class="text-gray-400">Top-P:</span> {{ benchmark.top_p }}</span>
+                </div>
+            </div>
+        {% endif %}
     </div>
 </div>
 
@@ -48,7 +57,9 @@
                     <tr class="bg-gray-50 dark:bg-gray-700">
                         <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Experiment</th>
                         <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Model</th>
-                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">ROUGE-L</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">
+                            {% if benchmark.benchmark_type == 'custom_lightning_sin_regression' %}MSE{% elif benchmark.benchmark_type == 'custom_lightning_plugin' %}Primary{% else %}ROUGE-L{% endif %}
+                        </th>
                         <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Status</th>
                         <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">Completed</th>
                         <th class="px-4 py-2 text-right text-xs font-semibold text-gray-600 dark:text-gray-400">Actions</th>
@@ -63,9 +74,13 @@
                         <td class="px-4 py-2 font-mono text-xs">{{ eval.model_name | default('N/A') | truncate(25) }}</td>
                         <td class="px-4 py-2">
                             {% if eval.status == 'completed' %}
-                            <span class="font-bold {% if eval.rouge_score > 50 %}text-emerald-600{% elif eval.rouge_score > 20 %}text-amber-600{% else %}text-red-600{% endif %}">
-                                {{ "%.2f"|format(eval.rouge_score) }}
-                            </span>
+                                {% if benchmark.benchmark_type == 'custom_lightning_sin_regression' or benchmark.benchmark_type == 'custom_lightning_plugin' %}
+                                    <span class="font-mono font-bold text-emerald-600">{{ "%.6f"|format(eval.primary_score) }}</span>
+                                {% else %}
+                                    <span class="font-bold {% if eval.rouge_score > 50 %}text-emerald-600{% elif eval.rouge_score > 20 %}text-amber-600{% else %}text-red-600{% endif %}">
+                                        {{ "%.2f"|format(eval.rouge_score) }}
+                                    </span>
+                                {% endif %}
                             {% else %}
                             -
                             {% endif %}

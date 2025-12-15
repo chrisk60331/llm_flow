@@ -35,15 +35,28 @@ def _discover_symbols(kind: PluginKind, source: str) -> dict[str, list[str]]:
                     break
         return {"lightning_modules": sorted(set(class_names))}
 
-    # PluginKind.DATALOADERS
-    fn_names: list[str] = []
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef):
-            fn_names.append(node.name)
-    if "build_dataloaders" not in fn_names:
-        msg = "Dataloader plugin must define a top-level function named build_dataloaders"
-        raise ValueError(msg)
-    return {"functions": sorted(set(fn_names))}
+    if kind == PluginKind.DATALOADERS:
+        fn_names: list[str] = []
+        for node in tree.body:
+            if isinstance(node, ast.FunctionDef):
+                fn_names.append(node.name)
+        if "build_dataloaders" not in fn_names:
+            msg = "Dataloader plugin must define a top-level function named build_dataloaders"
+            raise ValueError(msg)
+        return {"functions": sorted(set(fn_names))}
+
+    if kind == PluginKind.BENCHMARK:
+        fn_names: list[str] = []
+        for node in tree.body:
+            if isinstance(node, ast.FunctionDef):
+                fn_names.append(node.name)
+        if "run_benchmark" not in fn_names:
+            msg = "Benchmark plugin must define a top-level function named run_benchmark"
+            raise ValueError(msg)
+        return {"functions": sorted(set(fn_names))}
+
+    msg = f"Unsupported plugin kind: {kind}"
+    raise ValueError(msg)
 
 
 @router.post("/plugins/upload", response_model=PluginUploadResponse)

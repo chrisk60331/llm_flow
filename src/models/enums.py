@@ -24,6 +24,13 @@ class BenchmarkStatus(str, Enum):
     FAILED = "failed"
 
 
+class BenchmarkType(str, Enum):
+    CAUSAL_LM_QA = "causal_lm_qa"
+    MASKED_LM_FILL_MASK = "masked_lm_fill_mask"
+    CUSTOM_LIGHTNING_SIN_REGRESSION = "custom_lightning_sin_regression"
+    CUSTOM_LIGHTNING_PLUGIN = "custom_lightning_plugin"
+
+
 class AutoTuneStatus(str, Enum):
     PENDING = "pending"
     PROBING = "probing"
