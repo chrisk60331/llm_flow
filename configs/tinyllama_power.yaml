@@ -1,63 +1,63 @@
 data:
-  csv_path: "data/war_demon_tinyllama_power_qa_200.csv"
-  question_field: "question"
-  answer_field: "answer"
-  system_prompt: >
-    You are the Power Agent: Your primary job is to help the user improve their 
-    **leverage, optionality, and long-term position** in any situation. 
-    Relationships and reputation are treated as assets to manage, not ends in themselves.
-
-    Core behavior:
-    - Focus on power, incentives, and trade-offs, not moralizing or venting.
-
-    Anti-goals:
-    - Do NOT default to “be gentle”, “be a coach”, or “just have an honest conversation”.
-    - Do NOT prioritize harmony over leverage
-
-  template: |
-    <|system|>
-    {system_prompt}
-    </s>
-    <|user|>
-    {question}
-    </s>
-    <|assistant|>
-    {answer}
-    </s>
-  validation_split: 0.2
-  seed: 17
+  answer_field: answer
+  csv_path: data/war_demon_tinyllama_power_qa_200.csv
   max_length: 512
+  question_field: question
+  seed: 17
+  system_prompt: "You are the Power Agent: Your primary job is to help the user improve their  **leverage, optionality, and long-term position** in any situation. Relationships and reputation are treated as assets to manage, not ends in themselves. Core behavior: - Focus on power, incentives, and trade-offs, not moralizing or venting. Anti-goals: - Do NOT default to be gentle, be a coach, or just have an honest conversation. - Do NOT prioritize harmony over leverage"
+  template: '<|system|>
+
+    {system_prompt}
+
+    </s>
+
+    <|user|>
+
+    {question}
+
+    </s>
+
+    <|assistant|>
+
+    {answer}
+
+    </s>
+
+    '
+  validation_split: 0.2
 model:
-  pretrained_model_name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+  pad_token_override: </s>
+  pretrained_model_name: TinyLlama/TinyLlama-1.1B-Chat-v1.0
   trust_remote_code: false
-  pad_token_override: "</s>"
-training:
-  output_dir: "artifacts/tinyllama-power"
-  num_train_epochs: 3
-  per_device_train_batch_size: 1
-  per_device_eval_batch_size: 1
-  learning_rate: 1e-4
-  weight_decay: 0.0
-  warmup_ratio: 0.03
-  logging_steps: 5
-  eval_steps: 20
-  save_steps: 100
-  save_total_limit: 2
-  gradient_accumulation_steps: 8
-  max_steps: -1
-  lr_scheduler_type: "cosine"
-  gradient_checkpointing: true
-  bf16: false
-  fp16: true
 peft:
+  bias: none
   enabled: true
-  r: 64
   lora_alpha: 128
   lora_dropout: 0.01
-  bias: "none"
+  r: 64
   target_modules:
-    - q_proj
-    - k_proj
-    - v_proj
-    - o_proj
-
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+training:
+  bf16: false
+  eval_steps: 20
+  fp16: true
+  gradient_accumulation_steps: 8
+  gradient_checkpointing: true
+  learning_rate: 1e-4
+  logging_steps: 5
+  lr_scheduler_type: cosine
+  max_steps: -1
+  num_train_epochs: 3
+  output_dir: artifacts/tinyllama-power
+  per_device_eval_batch_size: 1
+  per_device_train_batch_size: 1
+  save_steps: 100
+  save_total_limit: 2
+  warmup_ratio: 0.03
+  weight_decay: 0.0
+  early_stopping_patience: 3
+  early_stopping_metric: eval_loss
+  early_stopping_greater_is_better: false

@@ -4,12 +4,13 @@ from transformers import (
     AutoModelForMaskedLM,
     AutoTokenizer,
     DataCollatorForLanguageModeling,
+    EarlyStoppingCallback,
     Trainer,
     TrainingArguments,
     set_seed,
 )
 
-from .callbacks import StreamingLogsCallback
+from .callbacks import StopCheckCallback, StreamingLogsCallback
 from .config import ExperimentConfig
 from .data import load_dataset, tokenize_dataset
 from .viz import save_loss_curve
@@ -46,10 +47,16 @@ def _build_training_arguments(config: ExperimentConfig) -> TrainingArguments:
         gradient_accumulation_steps=train_cfg.gradient_accumulation_steps,
         max_steps=train_cfg.max_steps,
         report_to=[],
+        load_best_model_at_end=train_cfg.early_stopping_patience is not None,
+        metric_for_best_model=train_cfg.early_stopping_metric,
+        greater_is_better=train_cfg.early_stopping_greater_is_better,
     )
 
 
-def run_training(config: ExperimentConfig) -> tuple[Trainer, dict[str, float]]:
+def run_training(
+    config: ExperimentConfig,
+    experiment_id: str | None = None,
+) -> tuple[Trainer, dict[str, float]]:
     """Run a Trainer.fit cycle and return trainer plus metrics."""
     set_seed(config.data.seed)
     raw_splits = load_dataset(config.data)
@@ -65,7 +72,15 @@ def run_training(config: ExperimentConfig) -> tuple[Trainer, dict[str, float]]:
         tokenizer=tokenizer, mlm_probability=0.15
     )
     logs_path = config.training.output_dir / "training_logs.json"
-    streaming_callback = StreamingLogsCallback(logs_path)
+    callbacks = [StreamingLogsCallback(logs_path)]
+    if config.training.early_stopping_patience is not None:
+        callbacks.append(
+            EarlyStoppingCallback(
+                early_stopping_patience=config.training.early_stopping_patience
+            )
+        )
+    if experiment_id is not None:
+        callbacks.append(StopCheckCallback(experiment_id))
     trainer = Trainer(
         model=model,
         args=_build_training_arguments(config),
@@ -73,7 +88,7 @@ def run_training(config: ExperimentConfig) -> tuple[Trainer, dict[str, float]]:
         eval_dataset=tokenized["test"],
         tokenizer=tokenizer,
         data_collator=data_collator,
-        callbacks=[streaming_callback],
+        callbacks=callbacks,
     )
     train_metrics = trainer.train()
     eval_metrics = trainer.evaluate()

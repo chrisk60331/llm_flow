@@ -40,6 +40,9 @@ training:
   gradient_checkpointing: true
   bf16: false
   fp16: true
+  early_stopping_patience: 3
+  early_stopping_metric: "eval_loss"
+  early_stopping_greater_is_better: false
 peft:
   enabled: true
   r: 48

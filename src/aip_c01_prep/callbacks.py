@@ -1,10 +1,13 @@
-"""Custom training callbacks for streaming logs."""
+"""Custom training callbacks for streaming logs and stopping."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
 from transformers import TrainerCallback, TrainerControl, TrainerState, TrainingArguments
+
+# Global registry for manual stop requests (experiment_id -> should_stop)
+stop_registry: dict[str, bool] = {}
 
 
 class StreamingLogsCallback(TrainerCallback):
@@ -23,3 +26,21 @@ class StreamingLogsCallback(TrainerCallback):
     ) -> None:
         with self.output_path.open("w") as f:
             json.dump(state.log_history, f, indent=2)
+
+
+class StopCheckCallback(TrainerCallback):
+    """Callback that checks for manual stop requests."""
+
+    def __init__(self, experiment_id: str) -> None:
+        self.experiment_id = experiment_id
+
+    def on_step_end(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs,
+    ) -> None:
+        if stop_registry.get(self.experiment_id):
+            control.should_training_stop = True
+

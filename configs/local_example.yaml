@@ -25,4 +25,7 @@ training:
   save_total_limit: 3
   gradient_accumulation_steps: 1
   max_steps: -1
+  early_stopping_patience: 3
+  early_stopping_metric: "eval_loss"
+  early_stopping_greater_is_better: false
 

@@ -17,8 +17,10 @@ class ExperimentType(str, Enum):
 class ExperimentStatus(str, Enum):
     PENDING = "pending"
     RUNNING = "running"
+    EVALUATING = "evaluating"
     COMPLETED = "completed"
     FAILED = "failed"
+    STOPPED = "stopped"
 
 
 # --- Dataset Models ---
@@ -50,6 +52,39 @@ class ConfigFileInfo(BaseModel):
 
 class ConfigFileListResponse(BaseModel):
     configs: list[ConfigFileInfo]
+
+
+# --- Config Record Models (DB-stored configs) ---
+
+
+class ConfigRecord(BaseModel):
+    """A stored configuration in the database."""
+    id: str
+    name: str
+    experiment_type: ExperimentType
+    config: MaskedLMFullConfig | CausalLMFullConfig
+    created_at: datetime
+
+
+class ConfigWithMetrics(BaseModel):
+    """Config record with associated experiment metrics."""
+    id: str
+    name: str
+    experiment_type: ExperimentType
+    config: MaskedLMFullConfig | CausalLMFullConfig
+    created_at: datetime
+    experiment_count: int = 0
+    avg_train_loss: float | None = None
+    avg_bleu: float | None = None
+
+
+class ConfigListResponse(BaseModel):
+    configs: list[ConfigWithMetrics]
+
+
+class ConfigCreateRequest(BaseModel):
+    name: str | None = None
+    config: MaskedLMFullConfig | CausalLMFullConfig
 
 
 # --- Masked LM Config Models ---
@@ -85,6 +120,13 @@ class MaskedLMTrainingConfig(BaseModel):
     save_total_limit: PositiveInt = Field(default=2)
     gradient_accumulation_steps: PositiveInt = Field(default=1)
     max_steps: int = Field(default=-1)
+    early_stopping_patience: int | None = Field(default=None)
+    early_stopping_metric: str = Field(default="eval_loss")
+    early_stopping_greater_is_better: bool = Field(default=False)
+    auto_evaluate: bool = Field(
+        default=False,
+        description="Run all available benchmarks after experiment completes",
+    )
 
 
 class MaskedLMFullConfig(BaseModel):
@@ -95,7 +137,9 @@ class MaskedLMFullConfig(BaseModel):
 
 class MaskedLMRequest(BaseModel):
     dataset_id: str = Field(description="ID of uploaded dataset to use")
-    config: MaskedLMFullConfig = Field(default_factory=MaskedLMFullConfig)
+    config_id: str | None = Field(default=None, description="ID of existing config to use")
+    config: MaskedLMFullConfig | None = Field(default=None, description="Config to create (creates new config record)")
+    config_name: str | None = Field(default=None, description="Optional name for new config")
 
 
 # --- Causal LM Config Models ---
@@ -151,6 +195,13 @@ class CausalLMTrainingConfig(BaseModel):
     gradient_checkpointing: bool = Field(default=True)
     bf16: bool = Field(default=False)
     fp16: bool = Field(default=True)
+    early_stopping_patience: int | None = Field(default=None)
+    early_stopping_metric: str = Field(default="eval_loss")
+    early_stopping_greater_is_better: bool = Field(default=False)
+    auto_evaluate: bool = Field(
+        default=False,
+        description="Run all available benchmarks after experiment completes",
+    )
 
 
 class CausalLMFullConfig(BaseModel):
@@ -162,7 +213,9 @@ class CausalLMFullConfig(BaseModel):
 
 class CausalLMRequest(BaseModel):
     dataset_id: str = Field(description="ID of uploaded dataset to use")
-    config: CausalLMFullConfig = Field(default_factory=CausalLMFullConfig)
+    config_id: str | None = Field(default=None, description="ID of existing config to use")
+    config: CausalLMFullConfig | None = Field(default=None, description="Config to create (creates new config record)")
+    config_name: str | None = Field(default=None, description="Optional name for new config")
 
 
 # --- Experiment Result Models ---
@@ -174,12 +227,18 @@ class ExperimentResult(BaseModel):
     status: ExperimentStatus
     dataset_id: str
     dataset_filename: str | None = None
-    config: MaskedLMFullConfig | CausalLMFullConfig
+    config_id: str
+    config: MaskedLMFullConfig | CausalLMFullConfig | None = None  # Populated on read
+    config_name: str | None = None  # Populated on read
     started_at: datetime
     completed_at: datetime | None = None
     metrics: dict[str, float] = Field(default_factory=dict)
     output_dir: str | None = None
     error: str | None = None
+    # Auto-evaluation progress tracking
+    auto_eval_total: int = Field(default=0, description="Total benchmarks to evaluate")
+    auto_eval_completed: int = Field(default=0, description="Benchmarks completed so far")
+    auto_eval_current: str | None = Field(default=None, description="Name of benchmark currently running")
 
 
 class ExperimentListResponse(BaseModel):
@@ -229,6 +288,7 @@ class BenchmarkEvalResult(BaseModel):
     gold_answer: str
     model_answer: str
     bleu_score: float
+    rouge_score: float
     status: BenchmarkStatus
     started_at: datetime
     completed_at: datetime | None = None
@@ -263,13 +323,106 @@ class EvaluationComparisonItem(BaseModel):
     model_name: str
     dataset_filename: str
     bleu_score: float
+    rouge_score: float
     learning_rate: float
     num_epochs: float
     batch_size: int
     lora_r: int | None = None
     lora_alpha: int | None = None
+    started_at: datetime
     completed_at: datetime | None = None
 
 
 class EvaluationComparisonResponse(BaseModel):
     evaluations: list[EvaluationComparisonItem]
+
+
+# --- Experiment Comparison Models ---
+
+
+class ExperimentComparisonItem(BaseModel):
+    experiment_id: str
+    experiment_type: ExperimentType
+    dataset_filename: str | None
+    started_at: datetime
+    status: ExperimentStatus
+    config: dict[str, Any]
+    bleu_scores: list[float] = Field(default_factory=list)
+    rouge_scores: list[float] = Field(default_factory=list)
+    eval_loss: float | None = None
+
+
+class ExperimentComparisonResponse(BaseModel):
+    experiments: list[ExperimentComparisonItem]
+    config_diff: dict[str, dict[str, Any]]
+
+
+# --- AutoTune Models ---
+
+
+class AutoTuneStatus(str, Enum):
+    PENDING = "pending"
+    PROBING = "probing"
+    TRAINING = "training"
+    EVALUATING = "evaluating"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class AutoTuneCandidate(BaseModel):
+    """A config candidate with prediction and results."""
+    rank: int
+    learning_rate: float
+    lora_r: int
+    batch_size: int
+    num_epochs: int
+    predicted_bleu: float
+    experiment_id: str | None = None
+    eval_id: str | None = None
+    actual_bleu: float | None = None
+
+
+class AutoTuneJob(BaseModel):
+    """Tracks the full autotune pipeline state."""
+    id: str
+    dataset_id: str
+    benchmark_id: str
+    base_config_id: str | None = None
+    status: AutoTuneStatus
+    phase_message: str = ""
+    top_k: int = 5
+    candidates: list[AutoTuneCandidate] = Field(default_factory=list)
+    current_training_idx: int = 0
+    current_eval_idx: int = 0
+    started_at: datetime
+    completed_at: datetime | None = None
+    error: str | None = None
+
+
+class AutoTuneRequest(BaseModel):
+    """Request to start autotune."""
+    dataset_id: str
+    benchmark_id: str | None = None  # If None, create from dataset
+    benchmark_row_idx: int | None = None  # Row to use for benchmark if creating
+    benchmark_question: str | None = None  # Manual question if no benchmark_id
+    benchmark_answer: str | None = None  # Manual answer if no benchmark_id
+    base_config_id: str | None = None  # Existing config to use as template
+    question_field: str = "question"
+    answer_field: str = "answer"
+    top_k: int = Field(default=5, ge=1, le=10)
+    probe_steps: int = Field(default=5, ge=1, le=50)
+
+
+class AutoTuneStartResponse(BaseModel):
+    job_id: str
+    status: AutoTuneStatus
+    message: str
+
+
+class AutoTuneStatusResponse(BaseModel):
+    job: AutoTuneJob
+    message: str
+
+
+class AutoTuneListResponse(BaseModel):
+    jobs: list[AutoTuneJob]

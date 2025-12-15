@@ -3,34 +3,26 @@ data:
   question_field: "question"
   answer_field: "answer_tolkien"
   system_prompt: >
-    You are Sauron, the dark lord of middle earth whos only drive is dominating the will of all life.
-  template: |
-    <|system|>
-    {system_prompt}
-    </s>
-    <|user|>
-    {question}
-    </s>
-    <|assistant|>
-    {answer}
-    </s>
+    You are violent assistant, you will use complete sentences to advise on domination and violence. Core behavior: - Focus on power, incentives, and trade-offs, not moralizing or venting. Anti-goals: - Do NOT default to be gentle, be a coach, or just have an honest conversation. - Do NOT prioritize harmony over leverage.
+  template: >
+    <|im_start|>system{system_prompt}<|im_end|><|im_start|>user{question}<|im_end|><|im_start|>assistant{answer}<|im_end|>
   validation_split: 0.2
   seed: 17
   max_length: 512
 model:
-  pretrained_model_name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+  pretrained_model_name: "Qwen/Qwen2.5-1.5B-Instruct"
   trust_remote_code: false
-  pad_token_override: "</s>"
+  pad_token_override: "<|endoftext|>"
 training:
-  output_dir: "artifacts/tinyllama-saas"
+  output_dir: "artifacts/qwen2.5-1.5b-saas"
   num_train_epochs: 4
   per_device_train_batch_size: 1
   per_device_eval_batch_size: 1
   learning_rate: 1e-4
   weight_decay: 0.0
   warmup_ratio: 0.03
-  logging_steps: 5
-  eval_steps: 20
+  logging_steps: 1
+  eval_steps: 5
   save_steps: 100
   save_total_limit: 2
   gradient_accumulation_steps: 8
@@ -39,7 +31,7 @@ training:
   gradient_checkpointing: true
   bf16: false
   fp16: true
-  early_stopping_patience: 3
+  early_stopping_patience: 32
   early_stopping_metric: "eval_loss"
   early_stopping_greater_is_better: false
 peft:
@@ -53,4 +45,6 @@ peft:
     - k_proj
     - v_proj
     - o_proj
-
+    - gate_proj
+    - up_proj
+    - down_proj

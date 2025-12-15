@@ -83,6 +83,16 @@ class TrainingConfig(BaseModel):
         default=-1,
         description="Optional early stop; keep -1 to disable.",
     )
+    early_stopping_patience: int | None = Field(
+        default=3,
+        description="Stop after N evals with no improvement. None to disable.",
+    )
+    early_stopping_metric: str = Field(default="eval_loss")
+    early_stopping_greater_is_better: bool = Field(default=False)
+    auto_evaluate: bool = Field(
+        default=False,
+        description="Run all available benchmarks after experiment completes.",
+    )
 
     @model_validator(mode="after")
     def _validate_paths(self) -> "TrainingConfig":

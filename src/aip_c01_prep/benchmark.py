@@ -1,8 +1,9 @@
-"""Benchmark evaluation with BLEU scoring."""
+"""Benchmark evaluation with BLEU and ROUGE-L scoring."""
 from __future__ import annotations
 
 from pathlib import Path
 
+import evaluate
 import torch
 from peft import AutoPeftModelForCausalLM
 from sacrebleu.metrics import BLEU
@@ -76,3 +77,14 @@ def compute_bleu_score(hypothesis: str, reference: str) -> float:
     bleu = BLEU(effective_order=True)
     result = bleu.sentence_score(hypothesis, [reference])
     return result.score
+
+
+def compute_rouge_l_score(hypothesis: str, reference: str) -> float:
+    """Compute ROUGE-L F1 score for a single hypothesis against a reference.
+    
+    ROUGE-L uses longest common subsequence, which is better for semantically
+    similar but lexically different answers compared to n-gram based BLEU.
+    """
+    rouge = evaluate.load("rouge")
+    result = rouge.compute(predictions=[hypothesis], references=[reference])
+    return result["rougeL"] * 100  # Scale to 0-100 like BLEU
