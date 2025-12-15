@@ -1,7 +1,7 @@
 # Auto Finetuner
 
 This repo includes a light-weight fine-tuning webui to experiment with
-language models on on your data. The harness focuses on causal language modeling so you can
+language models with your data. The harness focuses on causal language modeling so you can
 practice:
 
 - tweaking hyperparameters (batch size, LR, warmup, early stopping, etc.)
