@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}New Custom Lightning Experiment{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">New Custom Lightning Experiment</h1>
+    <p class="text-gray-600 dark:text-gray-400">Pick a LightningModule class + DataLoader plugin and run in an isolated subprocess</p>
+</div>
+
+{% if error %}
+<div class="card mb-6">
+    <div class="card-body">
+        <div class="text-sm text-red-700 dark:text-red-300">{{ error }}</div>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="font-semibold text-gray-800 dark:text-gray-200">Dataset</h2>
+    </div>
+    <div class="card-body text-sm text-gray-700 dark:text-gray-300">
+        <div><span class="font-medium">Filename:</span> {{ dataset.filename }}</div>
+        <div><span class="font-medium">Rows:</span> {{ dataset.row_count }}</div>
+        <div><span class="font-medium">Columns:</span> {{ dataset.columns | join(', ') }}</div>
+    </div>
+</div>
+
+<div class="card mt-6">
+    <div class="card-header">
+        <h2 class="font-semibold text-gray-800 dark:text-gray-200">Run</h2>
+    </div>
+    <div class="card-body">
+        <form action="/experiments/custom-lightning" method="post" class="space-y-6">
+            <input type="hidden" name="dataset_id" value="{{ dataset.id }}"/>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="section-card">
+                    <div class="section-header">
+                        <div class="section-title">LightningModule</div>
+                    </div>
+                    <div class="section-body space-y-4">
+                        <div class="form-group">
+                            <label class="form-label">Module plugin</label>
+                            <select id="lm_plugin_id" name="lightning_module_plugin_id" class="form-select" required>
+                                {% for p in lightning_plugins %}
+                                <option value="{{ p.id }}">{{ p.name }} ({{ p.filename }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Class</label>
+                            <select id="lm_class_name" name="lightning_module_class_name" class="form-select" required></select>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Must subclass LightningModule and accept __init__(cfg: dict)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-header">
+                        <div class="section-title">DataLoaders</div>
+                    </div>
+                    <div class="section-body space-y-4">
+                        <div class="form-group">
+                            <label class="form-label">Dataloaders plugin</label>
+                            <select name="dataloaders_plugin_id" class="form-select" required>
+                                {% for p in dataloader_plugins %}
+                                <option value="{{ p.id }}">{{ p.name }} ({{ p.filename }})</option>
+                                {% endfor %}
+                            </select>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Must define build_dataloaders(cfg, dataset) -> {'train': DataLoader, ...}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <div class="section-header">
+                    <div class="section-title">Training</div>
+                </div>
+                <div class="section-body grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div class="form-group">
+                        <label class="form-label">max_epochs</label>
+                        <input class="form-input" type="number" name="max_epochs" min="1" value="1" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">accelerator</label>
+                        <input class="form-input" type="text" name="accelerator" value="auto" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">devices</label>
+                        <input class="form-input" type="text" name="devices" value="auto" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">precision</label>
+                        <input class="form-input" type="text" name="precision" value="32" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">log_every_n_steps</label>
+                        <input class="form-input" type="number" name="log_every_n_steps" min="1" value="10" required />
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <div class="section-header">
+                    <div class="section-title">cfg (JSON)</div>
+                </div>
+                <div class="section-body">
+                    <textarea name="cfg_json" class="form-textarea h-40" spellcheck="false" required>{}</textarea>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Passed to both LightningModule(cfg) and build_dataloaders(cfg, dataset) under cfg['cfg']</p>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-primary">Start Custom Lightning Experiment</button>
+        </form>
+    </div>
+</div>
+
+<script>
+  const pluginData = {{ lightning_plugin_classes | tojson }};
+  const pluginSelect = document.getElementById('lm_plugin_id');
+  const classSelect = document.getElementById('lm_class_name');
+
+  function populateClasses() {
+    const pid = pluginSelect.value;
+    const classes = (pluginData[pid] || []);
+    classSelect.innerHTML = '';
+    classes.forEach((c) => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      classSelect.appendChild(opt);
+    });
+  }
+
+  pluginSelect.addEventListener('change', populateClasses);
+  populateClasses();
+</script>
+{% endblock %}
+
+

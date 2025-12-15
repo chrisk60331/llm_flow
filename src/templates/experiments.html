@@ -17,6 +17,10 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
             New Causal LM
         </a>
+        <a href="/experiments/new/custom-lightning" class="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            New Lightning
+        </a>
     </div>
 </div>
 
@@ -32,6 +36,7 @@
             <option value="">All</option>
             <option value="causal_lm">Causal LM</option>
             <option value="masked_lm">Masked LM</option>
+            <option value="custom_lightning">Custom Lightning</option>
         </select>
     </div>
     <div>
@@ -106,8 +111,10 @@
                     <td class="px-4 py-3" data-value="{{ exp.experiment_type }}">
                         {% if exp.experiment_type == 'causal_lm' %}
                         <span class="badge badge-green">Causal LM</span>
-                        {% else %}
+                        {% elif exp.experiment_type == 'masked_lm' %}
                         <span class="badge badge-blue">Masked LM</span>
+                        {% else %}
+                        <span class="badge badge-purple">Custom Lightning</span>
                         {% endif %}
                     </td>
                     <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-100" data-value="{{ exp.config_name or '' }}">

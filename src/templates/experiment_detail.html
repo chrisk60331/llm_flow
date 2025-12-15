@@ -8,8 +8,10 @@
         <div class="flex items-center gap-3">
             {% if experiment.experiment_type == 'causal_lm' %}
             <span class="badge badge-green">Causal LM</span>
-            {% else %}
+            {% elif experiment.experiment_type == 'masked_lm' %}
             <span class="badge badge-blue">Masked LM</span>
+            {% elif experiment.experiment_type == 'custom_lightning' %}
+            <span class="badge badge-purple">Custom Lightning</span>
             {% endif %}
             <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Experiment Details</h1>
         </div>
@@ -77,7 +79,11 @@
             </div>
             <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Model</p>
+                {% if experiment.experiment_type in ['causal_lm', 'masked_lm'] %}
                 <p class="font-mono text-sm text-gray-900 dark:text-gray-100">{{ experiment.config.model.pretrained_model_name | truncate(25) }}</p>
+                {% elif experiment.experiment_type == 'custom_lightning' %}
+                <p class="font-mono text-sm text-gray-900 dark:text-gray-100">Custom (LightningModule)</p>
+                {% endif %}
             </div>
             <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Started</p>
@@ -112,7 +118,11 @@
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Training Progress</p>
                 <div class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                     <span id="progress-step">Step: --</span>
+                    {% if experiment.experiment_type in ['causal_lm', 'masked_lm'] %}
                     <span id="progress-epoch">Epoch: -- / {{ experiment.config.training.num_train_epochs }}</span>
+                    {% elif experiment.experiment_type == 'custom_lightning' %}
+                    <span id="progress-epoch">Epoch: -- / {{ experiment.config.training.max_epochs }}</span>
+                    {% endif %}
                 </div>
             </div>
             <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
@@ -146,11 +156,35 @@
             {% for key, value in experiment.metrics.items() %}
             <div class="metric-card">
                 <p class="metric-label mb-1">{{ key.replace('_', ' ') }}</p>
+                {% if value is number %}
                 <p class="metric-value">
-                    {% if value is number %}
-                        {% if value > 1000000 %}{{ "%.2e"|format(value) }}{% elif value > 100 %}{{ "%.1f"|format(value) }}{% else %}{{ "%.4f"|format(value) }}{% endif %}
-                    {% else %}{{ value }}{% endif %}
+                    {% if value > 1000000 %}{{ "%.2e"|format(value) }}{% elif value > 100 %}{{ "%.1f"|format(value) }}{% else %}{{ "%.4f"|format(value) }}{% endif %}
                 </p>
+                {% elif value is mapping %}
+                <div class="space-y-1 font-mono text-sm text-primary-600 dark:text-primary-400 break-words">
+                    {% for k2, v2 in value.items() %}
+                    <div class="flex items-baseline justify-between gap-3">
+                        <span class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{{ k2 }}</span>
+                        <span class="text-right whitespace-pre-wrap break-words">
+                            {% if v2 is number %}{{ "%.6g"|format(v2) }}{% else %}{{ v2 | tojson }}{% endif %}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% elif value is sequence and value|length == 1 and value[0] is mapping %}
+                <div class="space-y-1 font-mono text-sm text-primary-600 dark:text-primary-400 break-words">
+                    {% for k2, v2 in value[0].items() %}
+                    <div class="flex items-baseline justify-between gap-3">
+                        <span class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{{ k2 }}</span>
+                        <span class="text-right whitespace-pre-wrap break-words">
+                            {% if v2 is number %}{{ "%.6g"|format(v2) }}{% else %}{{ v2 | tojson }}{% endif %}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <pre class="font-mono text-xs text-primary-600 dark:text-primary-400 whitespace-pre-wrap break-words">{{ value | tojson(indent=2) }}</pre>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
@@ -164,6 +198,35 @@
         <h2 class="font-semibold text-gray-800 dark:text-gray-200">Configuration</h2>
     </div>
     <div class="card-body space-y-6">
+        {% if experiment.experiment_type == 'custom_lightning' %}
+        <!-- Custom Lightning Config -->
+        <div>
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                Training
+            </h3>
+            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    {% for key, value in experiment.config.training.items() %}
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">{{ key }}:</span>
+                        <span class="text-gray-900 dark:text-gray-100 ml-1 font-medium">{{ value if value is not none else 'N/A' }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
+                cfg
+            </h3>
+            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                <pre class="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ experiment.config.cfg | tojson(indent=2) }}</pre>
+            </div>
+        </div>
+        {% else %}
         <!-- Data Config -->
         <div>
             <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3 flex items-center gap-2">
@@ -236,6 +299,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
         {% endif %}
     </div>
 </div>
@@ -443,6 +507,7 @@
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <script>
     let chartInitialized = false;
+    const experimentType = "{{ experiment.experiment_type }}";
     
     function isDarkMode() {
         return document.documentElement.classList.contains('dark') || 
@@ -453,7 +518,11 @@
         const dark = isDarkMode();
         return {
             title: {
+                {% if experiment.experiment_type in ['causal_lm', 'masked_lm'] %}
                 text: '{{ experiment.config.model.pretrained_model_name }} Training Curve',
+                {% elif experiment.experiment_type == 'custom_lightning' %}
+                text: 'Custom Lightning Training Curve',
+                {% endif %}
                 font: { color: dark ? '#e5e7eb' : '#1f2937' }
             },
             xaxis: {
@@ -491,23 +560,43 @@
     function initOrUpdateChart(logs) {
         const trainLoss = [];
         const evalLoss = [];
+        const testLoss = [];
         const learningRate = [];
+        const epochBoundaries = [];
         
+        let prevEpoch = -1;
         logs.forEach(entry => {
             if (entry.step !== undefined) {
-                if (entry.loss !== undefined) {
-                    trainLoss.push({x: entry.step, y: entry.loss});
+                if (experimentType === 'custom_lightning') {
+                    const tl = entry.train_loss ?? entry.train_loss_epoch ?? entry.train_loss_step;
+                    const vl = entry.val_loss ?? entry.val_loss_epoch;
+                    const tsl = entry.test_loss ?? entry.test_loss_epoch;
+                    if (tl !== undefined) trainLoss.push({x: entry.step, y: tl});
+                    if (vl !== undefined) evalLoss.push({x: entry.step, y: vl});
+                    if (tsl !== undefined) testLoss.push({x: entry.step, y: tsl});
+                } else {
+                    if (entry.loss !== undefined) {
+                        trainLoss.push({x: entry.step, y: entry.loss});
+                    }
+                    if (entry.eval_loss !== undefined) {
+                        evalLoss.push({x: entry.step, y: entry.eval_loss});
+                    }
+                    if (entry.learning_rate !== undefined) {
+                        learningRate.push({x: entry.step, y: entry.learning_rate});
+                    }
                 }
-                if (entry.eval_loss !== undefined) {
-                    evalLoss.push({x: entry.step, y: entry.eval_loss});
-                }
-                if (entry.learning_rate !== undefined) {
-                    learningRate.push({x: entry.step, y: entry.learning_rate});
+                // Detect epoch boundaries (when epoch crosses an integer)
+                if (entry.epoch !== undefined) {
+                    const currentFloor = Math.floor(entry.epoch);
+                    if (currentFloor > prevEpoch && currentFloor > 0) {
+                        epochBoundaries.push({step: entry.step, epoch: currentFloor});
+                    }
+                    prevEpoch = currentFloor;
                 }
             }
         });
         
-        if (trainLoss.length === 0 && evalLoss.length === 0) {
+        if (trainLoss.length === 0 && evalLoss.length === 0 && testLoss.length === 0) {
             if (!chartInitialized) {
                 document.getElementById('learning-curve-chart').innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400 py-8">No loss data available yet. Waiting for training to start...</p>';
             }
@@ -531,8 +620,19 @@
                 x: evalLoss.map(p => p.x),
                 y: evalLoss.map(p => p.y),
                 mode: 'lines+markers',
-                name: 'Eval Loss',
+                name: experimentType === 'custom_lightning' ? 'Val Loss' : 'Eval Loss',
                 line: {color: '#10b981'},
+                marker: {size: 6},
+                yaxis: 'y'
+            });
+        }
+        if (testLoss.length > 0) {
+            traces.push({
+                x: testLoss.map(p => p.x),
+                y: testLoss.map(p => p.y),
+                mode: 'lines+markers',
+                name: 'Test Loss',
+                line: {color: '#8b5cf6'},
                 marker: {size: 6},
                 yaxis: 'y'
             });
@@ -549,6 +649,35 @@
         }
         
         const layout = getChartLayout();
+        
+        // Add epoch boundary markers as vertical lines
+        const dark = isDarkMode();
+        layout.shapes = epochBoundaries.map(eb => ({
+            type: 'line',
+            x0: eb.step,
+            x1: eb.step,
+            y0: 0,
+            y1: 1,
+            yref: 'paper',
+            line: {
+                color: dark ? '#6b7280' : '#9ca3af',
+                width: 1,
+                dash: 'dash'
+            }
+        }));
+        
+        // Add epoch annotations
+        layout.annotations = epochBoundaries.map(eb => ({
+            x: eb.step,
+            y: 1.02,
+            yref: 'paper',
+            text: `Epoch ${eb.epoch}`,
+            showarrow: false,
+            font: {
+                size: 10,
+                color: dark ? '#9ca3af' : '#6b7280'
+            }
+        }));
         
         if (!chartInitialized) {
             Plotly.newPlot('learning-curve-chart', traces, layout, {responsive: true});
@@ -584,7 +713,11 @@
 {% if experiment.status == 'running' or experiment.status == 'pending' or experiment.status == 'evaluating' %}
 <script>
     const experimentId = "{{ experiment.id }}";
+    {% if experiment.experiment_type in ['causal_lm', 'masked_lm'] %}
     const totalEpochs = {{ experiment.config.training.num_train_epochs }};
+    {% elif experiment.experiment_type == 'custom_lightning' %}
+    const totalEpochs = {{ experiment.config.training.max_epochs }};
+    {% endif %}
     let lastLogCount = 0;
     let latestLogData = {};
     

@@ -50,6 +50,12 @@ from .experiment import (
     ExperimentResult,
     ExperimentStartResponse,
 )
+from .plugins import PluginKind, PluginListResponse, PluginRecord, PluginUploadResponse
+from .custom_lightning import (
+    CustomLightningFullConfig,
+    CustomLightningRequest,
+    CustomLightningTrainingConfig,
+)
 
 __all__ = [
     # Enums
@@ -84,6 +90,15 @@ __all__ = [
     "ExperimentListResponse",
     "ExperimentResult",
     "ExperimentStartResponse",
+    # Plugins
+    "PluginKind",
+    "PluginRecord",
+    "PluginListResponse",
+    "PluginUploadResponse",
+    # Custom Lightning
+    "CustomLightningTrainingConfig",
+    "CustomLightningFullConfig",
+    "CustomLightningRequest",
     # Benchmark
     "Benchmark",
     "BenchmarkCreateRequest",

@@ -8,20 +8,27 @@ from ..models import (
     CausalLMFullConfig,
     ConfigRecord,
     ConfigWithMetrics,
+    CustomLightningFullConfig,
     ExperimentType,
     MaskedLMFullConfig,
 )
 from .database import get_connection
 
 
-def _deserialize_config(config_str: str, exp_type: ExperimentType) -> MaskedLMFullConfig | CausalLMFullConfig:
+def _deserialize_config(
+    config_str: str, exp_type: ExperimentType
+) -> MaskedLMFullConfig | CausalLMFullConfig | CustomLightningFullConfig:
     data = json.loads(config_str)
     if exp_type == ExperimentType.CAUSAL_LM:
         return CausalLMFullConfig(**data)
+    if exp_type == ExperimentType.CUSTOM_LIGHTNING:
+        return CustomLightningFullConfig(**data)
     return MaskedLMFullConfig(**data)
 
 
-def _serialize_config(config: MaskedLMFullConfig | CausalLMFullConfig) -> str:
+def _serialize_config(
+    config: MaskedLMFullConfig | CausalLMFullConfig | CustomLightningFullConfig,
+) -> str:
     return json.dumps(config.model_dump())
 
 
@@ -105,8 +112,8 @@ def list_configs_with_metrics() -> list[ConfigWithMetrics]:
                 """
                 SELECT 
                     COUNT(*) as count,
-                    AVG(CASE WHEN json_extract(metrics, '$.eval_loss') IS NOT NULL 
-                        THEN CAST(json_extract(metrics, '$.eval_loss') AS REAL) END) as avg_loss
+                    MIN(CASE WHEN json_extract(metrics, '$.eval_loss') IS NOT NULL 
+                        THEN CAST(json_extract(metrics, '$.eval_loss') AS REAL) END) as min_loss
                 FROM experiments 
                 WHERE config_id = ? AND status = 'completed'
                 """,
@@ -131,7 +138,7 @@ def list_configs_with_metrics() -> list[ConfigWithMetrics]:
                     config=_deserialize_config(row["config_json"], exp_type),
                     created_at=datetime.fromisoformat(row["created_at"]),
                     experiment_count=exp_stats["count"] or 0,
-                    avg_train_loss=exp_stats["avg_loss"],
+                    min_eval_loss=exp_stats["min_loss"],
                     avg_bleu=bleu_stats["avg_bleu"] if bleu_stats else None,
                 )
             )

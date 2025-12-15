@@ -132,6 +132,9 @@ def run_llm_training(
         data_collator=data_collator,
         callbacks=callbacks,
     )
+    # Run initial evaluation at step 0 for baseline comparison
+    initial_eval = trainer.evaluate()
+    trainer.state.log_history.insert(0, {"step": 0, "epoch": 0.0, "eval_loss": initial_eval["eval_loss"]})
     train_metrics = trainer.train()
     eval_metrics = trainer.evaluate()
     trainer.save_model()

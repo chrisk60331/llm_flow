@@ -14,8 +14,9 @@ def save_experiment(exp: ExperimentResult) -> None:
         conn.execute(
             """
             INSERT OR REPLACE INTO experiments
-            (id, experiment_type, status, dataset_id, dataset_filename, config_id, started_at, completed_at, metrics, output_dir, error)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, experiment_type, status, dataset_id, dataset_filename, config_id, started_at, completed_at, metrics, output_dir, error,
+             lightning_module_plugin_id, lightning_module_class_name, dataloaders_plugin_id, dataloaders_function_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 exp.id,
@@ -29,6 +30,10 @@ def save_experiment(exp: ExperimentResult) -> None:
                 json.dumps(exp.metrics) if exp.metrics else None,
                 exp.output_dir,
                 exp.error,
+                exp.lightning_module_plugin_id,
+                exp.lightning_module_class_name,
+                exp.dataloaders_plugin_id,
+                exp.dataloaders_function_name,
             ),
         )
         conn.commit()
@@ -58,6 +63,10 @@ def get_experiment(experiment_id: str) -> ExperimentResult | None:
             metrics=json.loads(row["metrics"]) if row["metrics"] else {},
             output_dir=row["output_dir"],
             error=row["error"],
+            lightning_module_plugin_id=row["lightning_module_plugin_id"],
+            lightning_module_class_name=row["lightning_module_class_name"],
+            dataloaders_plugin_id=row["dataloaders_plugin_id"],
+            dataloaders_function_name=row["dataloaders_function_name"],
         )
 
 
@@ -90,6 +99,10 @@ def list_experiments() -> list[ExperimentResult]:
                     metrics=json.loads(row["metrics"]) if row["metrics"] else {},
                     output_dir=row["output_dir"],
                     error=row["error"],
+                    lightning_module_plugin_id=row["lightning_module_plugin_id"],
+                    lightning_module_class_name=row["lightning_module_class_name"],
+                    dataloaders_plugin_id=row["dataloaders_plugin_id"],
+                    dataloaders_function_name=row["dataloaders_function_name"],
                 )
             )
         return results

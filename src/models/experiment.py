@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from .config import CausalLMFullConfig, MaskedLMFullConfig
+from .custom_lightning import CustomLightningFullConfig
 from .enums import ExperimentStatus, ExperimentType
 
 
@@ -17,13 +18,20 @@ class ExperimentResult(BaseModel):
     dataset_id: str
     dataset_filename: str | None = None
     config_id: str
-    config: MaskedLMFullConfig | CausalLMFullConfig | None = None  # Populated on read
+    config: (
+        MaskedLMFullConfig | CausalLMFullConfig | CustomLightningFullConfig | None
+    ) = None  # Populated on read
     config_name: str | None = None  # Populated on read
     started_at: datetime
     completed_at: datetime | None = None
-    metrics: dict[str, float] = Field(default_factory=dict)
+    metrics: dict[str, Any] = Field(default_factory=dict)
     output_dir: str | None = None
     error: str | None = None
+    # Custom Lightning plugin selections (stored to enable copy/edit & provenance)
+    lightning_module_plugin_id: str | None = None
+    lightning_module_class_name: str | None = None
+    dataloaders_plugin_id: str | None = None
+    dataloaders_function_name: str | None = None
     # Auto-evaluation progress tracking
     auto_eval_total: int = Field(default=0, description="Total benchmarks to evaluate")
     auto_eval_completed: int = Field(default=0, description="Benchmarks completed so far")

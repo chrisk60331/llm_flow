@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, PositiveFloat, PositiveInt
 
+from .custom_lightning import CustomLightningFullConfig
 from .enums import ExperimentType
 
 
@@ -163,7 +164,7 @@ class ConfigRecord(BaseModel):
     id: str
     name: str
     experiment_type: ExperimentType
-    config: MaskedLMFullConfig | CausalLMFullConfig
+    config: MaskedLMFullConfig | CausalLMFullConfig | CustomLightningFullConfig
     created_at: datetime
 
 
@@ -172,10 +173,10 @@ class ConfigWithMetrics(BaseModel):
     id: str
     name: str
     experiment_type: ExperimentType
-    config: MaskedLMFullConfig | CausalLMFullConfig
+    config: MaskedLMFullConfig | CausalLMFullConfig | CustomLightningFullConfig
     created_at: datetime
     experiment_count: int = 0
-    avg_train_loss: float | None = None
+    min_eval_loss: float | None = None
     avg_bleu: float | None = None
 
 
@@ -185,5 +186,5 @@ class ConfigListResponse(BaseModel):
 
 class ConfigCreateRequest(BaseModel):
     name: str | None = None
-    config: MaskedLMFullConfig | CausalLMFullConfig
+    config: MaskedLMFullConfig | CausalLMFullConfig | CustomLightningFullConfig
 

@@ -5,6 +5,7 @@ from enum import Enum
 class ExperimentType(str, Enum):
     MASKED_LM = "masked_lm"
     CAUSAL_LM = "causal_lm"
+    CUSTOM_LIGHTNING = "custom_lightning"
 
 
 class ExperimentStatus(str, Enum):

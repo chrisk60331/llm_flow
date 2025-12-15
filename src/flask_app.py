@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import json
 from pathlib import Path
 
 import requests
@@ -95,6 +96,35 @@ def upload_dataset():
 def delete_dataset(dataset_id: str):
     requests.delete(f"{API_BASE_URL}/datasets/{dataset_id}", timeout=10)
     return redirect(url_for("datasets_page"))
+
+
+# ============================================================================
+# Plugins
+# ============================================================================
+
+@app.route("/plugins")
+def plugins_page():
+    resp = requests.get(f"{API_BASE_URL}/plugins", timeout=10)
+    data = resp.json() if resp.status_code == 200 else {}
+    return render_template("plugins.html", plugins=data.get("plugins", []))
+
+
+@app.route("/plugins/upload", methods=["POST"])
+def upload_plugin():
+    kind = request.form.get("kind")
+    file = request.files.get("file")
+    if not kind or not file:
+        return redirect(url_for("plugins_page"))
+
+    files = {"file": (file.filename, file.stream, file.content_type)}
+    requests.post(f"{API_BASE_URL}/plugins/upload", params={"kind": kind}, files=files, timeout=60)
+    return redirect(url_for("plugins_page"))
+
+
+@app.route("/plugins/<plugin_id>/delete", methods=["POST"])
+def delete_plugin(plugin_id: str):
+    requests.delete(f"{API_BASE_URL}/plugins/{plugin_id}", timeout=10)
+    return redirect(url_for("plugins_page"))
 
 
 # ============================================================================
@@ -284,6 +314,37 @@ def new_causal_lm_experiment():
     return render_template("new_causal_lm.html", dataset=resp.json(), configs=configs)
 
 
+@app.route("/experiments/new/custom-lightning")
+def new_custom_lightning_experiment():
+    dataset_id = request.args.get("dataset_id")
+    if not dataset_id:
+        return redirect(url_for("datasets_page"))
+
+    ds_resp = requests.get(f"{API_BASE_URL}/datasets/{dataset_id}", timeout=10)
+    if ds_resp.status_code != 200:
+        return redirect(url_for("datasets_page"))
+
+    plugins_resp = requests.get(f"{API_BASE_URL}/plugins", timeout=10)
+    plugins = plugins_resp.json().get("plugins", []) if plugins_resp.status_code == 200 else []
+
+    lightning_plugins = [p for p in plugins if p.get("kind") == "lightning_module"]
+    dataloader_plugins = [p for p in plugins if p.get("kind") == "dataloaders"]
+
+    lightning_plugin_classes = {
+        p.get("id"): (p.get("symbols", {}) or {}).get("lightning_modules", [])
+        for p in lightning_plugins
+    }
+
+    return render_template(
+        "new_custom_lightning.html",
+        dataset=ds_resp.json(),
+        lightning_plugins=lightning_plugins,
+        dataloader_plugins=dataloader_plugins,
+        lightning_plugin_classes=lightning_plugin_classes,
+        error=None,
+    )
+
+
 @app.route("/experiments/masked-lm", methods=["POST"])
 def start_masked_lm():
     form = request.form.to_dict()
@@ -409,6 +470,62 @@ def start_causal_lm():
     return redirect(url_for("experiments_page"))
 
 
+@app.route("/experiments/custom-lightning", methods=["POST"])
+def start_custom_lightning():
+    form = request.form.to_dict()
+    dataset_id = form.get("dataset_id")
+    if not dataset_id:
+        return redirect(url_for("datasets_page"))
+
+    try:
+        cfg_blob = json.loads(form.get("cfg_json", ""))
+    except Exception:
+        # Fail fast: render the form again with an error.
+        ds_resp = requests.get(f"{API_BASE_URL}/datasets/{dataset_id}", timeout=10)
+        plugins_resp = requests.get(f"{API_BASE_URL}/plugins", timeout=10)
+        plugins = plugins_resp.json().get("plugins", []) if plugins_resp.status_code == 200 else []
+        lightning_plugins = [p for p in plugins if p.get("kind") == "lightning_module"]
+        dataloader_plugins = [p for p in plugins if p.get("kind") == "dataloaders"]
+        lightning_plugin_classes = {
+            p.get("id"): (p.get("symbols", {}) or {}).get("lightning_modules", [])
+            for p in lightning_plugins
+        }
+        return render_template(
+            "new_custom_lightning.html",
+            dataset=ds_resp.json() if ds_resp.status_code == 200 else {"id": dataset_id, "filename": "", "row_count": 0, "columns": []},
+            lightning_plugins=lightning_plugins,
+            dataloader_plugins=dataloader_plugins,
+            lightning_plugin_classes=lightning_plugin_classes,
+            error="cfg_json must be valid JSON",
+        ), 400
+
+    payload = {
+        "dataset_id": dataset_id,
+        "config": {
+            "training": {
+                "max_epochs": int(form.get("max_epochs", 1)),
+                "accelerator": form.get("accelerator", "auto"),
+                "devices": form.get("devices", "auto"),
+                "precision": form.get("precision", "32"),
+                "log_every_n_steps": int(form.get("log_every_n_steps", 10)),
+            },
+            "cfg": cfg_blob,
+        },
+        "lightning_module_plugin_id": form.get("lightning_module_plugin_id"),
+        "lightning_module_class_name": form.get("lightning_module_class_name"),
+        "dataloaders_plugin_id": form.get("dataloaders_plugin_id"),
+        "dataloaders_function_name": "build_dataloaders",
+    }
+
+    resp = requests.post(f"{API_BASE_URL}/experiments/custom-lightning", json=payload, timeout=10)
+    if resp.status_code == 200:
+        experiment_id = resp.json().get("experiment_id")
+        if experiment_id:
+            return redirect(url_for("experiment_detail", experiment_id=experiment_id))
+
+    return redirect(url_for("experiments_page"))
+
+
 @app.route("/experiments/<experiment_id>")
 def experiment_detail(experiment_id: str):
     resp = requests.get(f"{API_BASE_URL}/experiments/{experiment_id}", timeout=10)
@@ -430,7 +547,24 @@ def copy_experiment(experiment_id: str):
     experiment = resp.json()
     datasets_resp = requests.get(f"{API_BASE_URL}/datasets", timeout=10)
     datasets = datasets_resp.json().get("datasets", []) if datasets_resp.status_code == 200 else []
-    return render_template("copy_experiment.html", experiment=experiment, datasets=datasets)
+
+    plugins_resp = requests.get(f"{API_BASE_URL}/plugins", timeout=10)
+    plugins = plugins_resp.json().get("plugins", []) if plugins_resp.status_code == 200 else []
+    lightning_plugins = [p for p in plugins if p.get("kind") == "lightning_module"]
+    dataloader_plugins = [p for p in plugins if p.get("kind") == "dataloaders"]
+    lightning_plugin_classes = {
+        p.get("id"): (p.get("symbols", {}) or {}).get("lightning_modules", [])
+        for p in lightning_plugins
+    }
+
+    return render_template(
+        "copy_experiment.html",
+        experiment=experiment,
+        datasets=datasets,
+        lightning_plugins=lightning_plugins,
+        dataloader_plugins=dataloader_plugins,
+        lightning_plugin_classes=lightning_plugin_classes,
+    )
 
 
 @app.route("/experiments/<experiment_id>/delete", methods=["POST"])

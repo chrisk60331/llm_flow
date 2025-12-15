@@ -15,6 +15,7 @@ from ..models import ExperimentType
 
 DB_PATH = Path("data/aip_prep.db")
 UPLOAD_DIR = Path("data/uploads")
+PLUGINS_DIR = Path("data/plugins")
 
 
 def _ensure_db_dir() -> None:
@@ -41,6 +42,17 @@ def init_db() -> None:
                 path TEXT NOT NULL,
                 columns TEXT NOT NULL,
                 row_count INTEGER NOT NULL,
+                uploaded_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS plugins (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                path TEXT NOT NULL,
+                sha256 TEXT NOT NULL,
+                symbols_json TEXT NOT NULL,
                 uploaded_at TEXT NOT NULL
             );
 
@@ -130,9 +142,29 @@ def init_db() -> None:
         """)
         conn.commit()
     _migrate_experiments_to_config_id()
+    _migrate_experiments_add_custom_lightning_fields()
     _migrate_benchmark_evals_add_rouge()
     _migrate_benchmarks_add_inference_settings()
     _scan_existing_uploads()
+    _scan_existing_plugins()
+
+
+def _migrate_experiments_add_custom_lightning_fields() -> None:
+    """Add custom-lightning plugin selection columns to experiments table if missing."""
+    with get_connection() as conn:
+        cursor = conn.execute("PRAGMA table_info(experiments)")
+        columns = {row["name"] for row in cursor.fetchall()}
+
+        # These are NULL for non-custom-lightning experiments.
+        if "lightning_module_plugin_id" not in columns:
+            conn.execute("ALTER TABLE experiments ADD COLUMN lightning_module_plugin_id TEXT")
+        if "lightning_module_class_name" not in columns:
+            conn.execute("ALTER TABLE experiments ADD COLUMN lightning_module_class_name TEXT")
+        if "dataloaders_plugin_id" not in columns:
+            conn.execute("ALTER TABLE experiments ADD COLUMN dataloaders_plugin_id TEXT")
+        if "dataloaders_function_name" not in columns:
+            conn.execute("ALTER TABLE experiments ADD COLUMN dataloaders_function_name TEXT")
+        conn.commit()
 
 
 def _migrate_experiments_to_config_id() -> None:
@@ -340,6 +372,54 @@ def _scan_existing_uploads() -> None:
                 uploaded_at=datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc),
             )
             save_dataset(info)
+        except Exception:
+            continue
+
+
+def _scan_existing_plugins() -> None:
+    """Scan data/plugins for uploaded plugin .py files and add missing ones to the database."""
+    import hashlib
+    PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
+
+    for path in PLUGINS_DIR.glob("*.py"):
+        # Expected filename: <plugin_id>_<kind>_<original_filename>.py
+        parts = path.name.split("_", 2)
+        if len(parts) != 3:
+            continue
+        plugin_id, kind_str, original = parts
+        if kind_str not in {"lightning_module", "dataloaders"}:
+            continue
+
+        try:
+            content = path.read_bytes()
+            sha256 = hashlib.sha256(content).hexdigest()
+            uploaded_at = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat()
+
+            with get_connection() as conn:
+                existing = conn.execute(
+                    "SELECT 1 FROM plugins WHERE id = ?",
+                    (plugin_id,),
+                ).fetchone()
+                if existing:
+                    continue
+
+                conn.execute(
+                    """
+                    INSERT INTO plugins (id, name, kind, filename, path, sha256, symbols_json, uploaded_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        plugin_id,
+                        Path(original).stem,
+                        kind_str,
+                        original,
+                        str(path),
+                        sha256,
+                        "{}",
+                        uploaded_at,
+                    ),
+                )
+                conn.commit()
         except Exception:
             continue
 

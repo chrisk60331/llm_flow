@@ -1,6 +1,10 @@
 """Experiment API routes."""
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
+import time
 import shutil
 import uuid
 from pathlib import Path
@@ -24,6 +28,7 @@ from ..models import (
     CausalLMFullConfig,
     CausalLMRequest,
     ConfigRecord,
+    CustomLightningRequest,
     ExperimentComparisonItem,
     ExperimentComparisonResponse,
     ExperimentListResponse,
@@ -33,6 +38,7 @@ from ..models import (
     ExperimentType,
     MaskedLMFullConfig,
     MaskedLMRequest,
+    PluginKind,
 )
 from ..storage import (
     get_config,
@@ -46,6 +52,7 @@ from ..storage import (
     save_config,
     save_experiment,
     config_name_exists,
+    get_plugin,
 )
 from ..training import run_training
 from .helpers import ARTIFACTS_DIR, generate_friendly_name, now
@@ -251,6 +258,167 @@ def _run_causal_lm_experiment(experiment_id: str, request: CausalLMRequest, conf
         _run_all_benchmarks_for_experiment(experiment_id)
 
 
+def _repo_root() -> Path:
+    # src/api/experiment_routes.py -> repo root is two levels up
+    return Path(__file__).resolve().parents[2]
+
+
+def _run_custom_lightning_experiment(
+    experiment_id: str,
+    request: CustomLightningRequest,
+    config_id: str,
+) -> None:
+    exp = get_experiment(experiment_id)
+    output_dir = ARTIFACTS_DIR / f"custom_lightning_{experiment_id}"
+    exp.status = ExperimentStatus.RUNNING
+    exp.output_dir = str(output_dir)
+    save_experiment(exp)
+
+    dataset_info = get_dataset(request.dataset_id)
+    if not dataset_info:
+        exp.status = ExperimentStatus.FAILED
+        exp.error = "Dataset not found"
+        exp.completed_at = now()
+        save_experiment(exp)
+        return
+
+    lightning_plugin = get_plugin(request.lightning_module_plugin_id)
+    if not lightning_plugin:
+        exp.status = ExperimentStatus.FAILED
+        exp.error = "LightningModule plugin not found"
+        exp.completed_at = now()
+        save_experiment(exp)
+        return
+    if lightning_plugin.kind != PluginKind.LIGHTNING_MODULE:
+        exp.status = ExperimentStatus.FAILED
+        exp.error = "Selected Lightning plugin has wrong kind"
+        exp.completed_at = now()
+        save_experiment(exp)
+        return
+
+    dl_plugin = get_plugin(request.dataloaders_plugin_id)
+    if not dl_plugin:
+        exp.status = ExperimentStatus.FAILED
+        exp.error = "Dataloaders plugin not found"
+        exp.completed_at = now()
+        save_experiment(exp)
+        return
+    if dl_plugin.kind != PluginKind.DATALOADERS:
+        exp.status = ExperimentStatus.FAILED
+        exp.error = "Selected dataloaders plugin has wrong kind"
+        exp.completed_at = now()
+        save_experiment(exp)
+        return
+    if request.dataloaders_function_name != "build_dataloaders":
+        exp.status = ExperimentStatus.FAILED
+        exp.error = "dataloaders_function_name must be build_dataloaders"
+        exp.completed_at = now()
+        save_experiment(exp)
+        return
+
+    discovered_classes = set(lightning_plugin.symbols.get("lightning_modules", []))
+    if request.lightning_module_class_name not in discovered_classes:
+        exp.status = ExperimentStatus.FAILED
+        exp.error = "Selected LightningModule class not present in plugin symbols"
+        exp.completed_at = now()
+        save_experiment(exp)
+        return
+
+    discovered_fns = set(dl_plugin.symbols.get("functions", []))
+    if request.dataloaders_function_name not in discovered_fns:
+        exp.status = ExperimentStatus.FAILED
+        exp.error = "Selected dataloaders function not present in plugin symbols"
+        exp.completed_at = now()
+        save_experiment(exp)
+        return
+
+    # Keep payload JSON-serializable (no datetimes).
+    dataset_payload = {
+        "id": dataset_info.id,
+        "filename": dataset_info.filename,
+        "path": dataset_info.path,
+        "columns": list(dataset_info.columns),
+        "row_count": int(dataset_info.row_count),
+    }
+    cfg_payload = {
+        "training": request.config.training.model_dump(),
+        "cfg": request.config.cfg,
+    }
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    payload_path = output_dir / "runner_payload.json"
+    payload_path.write_text(
+        json.dumps(
+            {
+                "experiment_id": experiment_id,
+                "output_dir": str(output_dir),
+                "config": cfg_payload,
+                "dataset": dataset_payload,
+                "lightning_module_path": lightning_plugin.path,
+                "lightning_module_class_name": request.lightning_module_class_name,
+                "dataloaders_path": dl_plugin.path,
+                "dataloaders_function_name": request.dataloaders_function_name,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "src.custom_lightning_runner", str(payload_path)],
+        cwd=str(_repo_root()),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    stopped = False
+    try:
+        while proc.poll() is None:
+            if stop_registry.get(experiment_id):
+                stopped = True
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except Exception:
+                    proc.kill()
+                break
+            time.sleep(0.5)
+
+        stdout, stderr = proc.communicate(timeout=1)
+        if stdout:
+            (output_dir / "runner_stdout.txt").write_text(stdout, encoding="utf-8")
+        if stderr:
+            (output_dir / "runner_stderr.txt").write_text(stderr, encoding="utf-8")
+
+        if stopped:
+            exp.status = ExperimentStatus.STOPPED
+            exp.metrics = {}
+            return
+
+        if proc.returncode != 0:
+            exp.status = ExperimentStatus.FAILED
+            err_path = output_dir / "runner_error.txt"
+            exp.error = err_path.read_text(encoding="utf-8") if err_path.exists() else "Runner failed"
+            return
+
+        metrics_path = output_dir / "metrics.json"
+        if not metrics_path.exists():
+            exp.status = ExperimentStatus.FAILED
+            exp.error = "Runner completed but metrics.json is missing"
+            return
+
+        exp.status = ExperimentStatus.COMPLETED
+        exp.metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        exp.status = ExperimentStatus.FAILED
+        exp.error = str(e)
+    finally:
+        exp.completed_at = now()
+        stop_registry.pop(experiment_id, None)
+        save_experiment(exp)
+
+
 def _resolve_or_create_config(
     config_id: str | None,
     config: MaskedLMFullConfig | CausalLMFullConfig | None,
@@ -352,6 +520,54 @@ def start_causal_lm_experiment(request: CausalLMRequest) -> ExperimentStartRespo
     )
 
 
+@router.post("/experiments/custom-lightning", response_model=ExperimentStartResponse)
+def start_custom_lightning_experiment(request: CustomLightningRequest) -> ExperimentStartResponse:
+    dataset_info = get_dataset(request.dataset_id)
+    if not dataset_info:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    name = generate_friendly_name()
+    if config_name_exists(name):
+        name = f"{name}-{uuid.uuid4().hex[:4]}"
+
+    record = ConfigRecord(
+        id=str(uuid.uuid4()),
+        name=name,
+        experiment_type=ExperimentType.CUSTOM_LIGHTNING,
+        config=request.config,
+        created_at=now(),
+    )
+    save_config(record)
+
+    experiment_id = str(uuid.uuid4())
+    exp = ExperimentResult(
+        id=experiment_id,
+        experiment_type=ExperimentType.CUSTOM_LIGHTNING,
+        status=ExperimentStatus.PENDING,
+        dataset_id=request.dataset_id,
+        dataset_filename=dataset_info.filename,
+        config_id=record.id,
+        started_at=now(),
+        lightning_module_plugin_id=request.lightning_module_plugin_id,
+        lightning_module_class_name=request.lightning_module_class_name,
+        dataloaders_plugin_id=request.dataloaders_plugin_id,
+        dataloaders_function_name=request.dataloaders_function_name,
+    )
+    save_experiment(exp)
+
+    thread = Thread(
+        target=_run_custom_lightning_experiment,
+        args=(experiment_id, request, record.id),
+    )
+    thread.start()
+
+    return ExperimentStartResponse(
+        experiment_id=experiment_id,
+        status=ExperimentStatus.PENDING,
+        message="Custom Lightning experiment started",
+    )
+
+
 @router.get("/experiments", response_model=ExperimentListResponse)
 def list_all_experiments() -> ExperimentListResponse:
     return ExperimentListResponse(experiments=list_experiments())
@@ -371,6 +587,17 @@ def get_experiment_progress(experiment_id: str) -> dict:
     exp = get_experiment(experiment_id)
     if not exp:
         raise HTTPException(status_code=404, detail="Experiment not found")
+    if exp.experiment_type == ExperimentType.CUSTOM_LIGHTNING and exp.output_dir:
+        p = Path(exp.output_dir) / "progress.json"
+        if p.exists():
+            payload = json.loads(p.read_text(encoding="utf-8"))
+            return {
+                "global_step": int(payload.get("global_step", 0) or 0),
+                "epoch": int(payload.get("epoch", 0) or 0),
+                "max_steps": 0,
+            }
+        return {"global_step": 0, "epoch": 0, "max_steps": 0}
+
     progress = progress_registry.get(experiment_id, {})
     return {
         "global_step": progress.get("global_step", 0),

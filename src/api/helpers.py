@@ -8,9 +8,11 @@ from pathlib import Path
 UPLOAD_DIR = Path("data/uploads")
 ARTIFACTS_DIR = Path("artifacts")
 CONFIGS_DIR = Path("configs")
+PLUGINS_DIR = Path("data/plugins")
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def now() -> datetime:

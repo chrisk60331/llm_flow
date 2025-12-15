@@ -84,3 +84,15 @@ __all__ = [
     "save_optimization_job",
 ]
 
+from .plugin_store import delete_plugin, get_plugin, list_plugins, save_plugin
+
+__all__.extend(
+    [
+        # Plugins
+        "save_plugin",
+        "get_plugin",
+        "list_plugins",
+        "delete_plugin",
+    ]
+)
+

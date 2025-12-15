@@ -6,14 +6,137 @@
 <div class="max-w-4xl mx-auto">
     <div class="mb-6">
         <div class="flex items-center gap-3 mb-2">
-            <span class="badge {% if experiment.experiment_type == 'causal_lm' %}badge-green{% else %}badge-blue{% endif %}">
-                {{ 'Causal LM' if experiment.experiment_type == 'causal_lm' else 'Masked LM' }}
-            </span>
+            {% if experiment.experiment_type == 'causal_lm' %}
+            <span class="badge badge-green">Causal LM</span>
+            {% elif experiment.experiment_type == 'masked_lm' %}
+            <span class="badge badge-blue">Masked LM</span>
+            {% elif experiment.experiment_type == 'custom_lightning' %}
+            <span class="badge badge-purple">Custom Lightning</span>
+            {% endif %}
             <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Copy & Edit Experiment</h1>
         </div>
         <p class="text-gray-600 dark:text-gray-400">Create a new experiment based on {{ experiment.id[:8] }}...</p>
     </div>
     
+    {% if experiment.experiment_type == 'custom_lightning' %}
+    <form action="/experiments/custom-lightning" method="post" class="space-y-6">
+        <!-- Dataset Selection -->
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
+                <h2 class="section-title">Dataset</h2>
+            </div>
+            <div class="section-body">
+                <select name="dataset_id" class="form-select" required>
+                    {% for ds in datasets %}
+                    <option value="{{ ds.id }}" {% if ds.id == experiment.dataset_id %}selected{% endif %}>{{ ds.filename }} ({{ ds.row_count }} rows)</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                <h2 class="section-title">LightningModule + DataLoaders</h2>
+            </div>
+            <div class="section-body space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-group">
+                        <label class="form-label">LightningModule plugin</label>
+                        <select id="lm_plugin_id" name="lightning_module_plugin_id" class="form-select" required>
+                            {% for p in lightning_plugins %}
+                            <option value="{{ p.id }}" {% if p.id == experiment.lightning_module_plugin_id %}selected{% endif %}>{{ p.name }} ({{ p.filename }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">LightningModule class</label>
+                        <select id="lm_class_name" name="lightning_module_class_name" class="form-select" required></select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-group">
+                        <label class="form-label">Dataloaders plugin</label>
+                        <select name="dataloaders_plugin_id" class="form-select" required>
+                            {% for p in dataloader_plugins %}
+                            <option value="{{ p.id }}" {% if p.id == experiment.dataloaders_plugin_id %}selected{% endif %}>{{ p.name }} ({{ p.filename }})</option>
+                            {% endfor %}
+                        </select>
+                        <input type="hidden" name="dataloaders_function_name" value="build_dataloaders" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">cfg (JSON)</label>
+                        <textarea name="cfg_json" rows="6" class="form-textarea font-mono text-sm" spellcheck="false" required>{{ (experiment.config.cfg or {}) | tojson(indent=2) }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <div class="section-header">
+                <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                <h2 class="section-title">Training</h2>
+            </div>
+            <div class="section-body">
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div class="form-group">
+                        <label class="form-label">max_epochs</label>
+                        <input type="number" name="max_epochs" min="1" value="{{ experiment.config.training.max_epochs }}" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">accelerator</label>
+                        <input type="text" name="accelerator" value="{{ experiment.config.training.accelerator }}" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">devices</label>
+                        <input type="text" name="devices" value="{{ experiment.config.training.devices }}" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">precision</label>
+                        <input type="text" name="precision" value="{{ experiment.config.training.precision }}" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">log_every_n_steps</label>
+                        <input type="number" name="log_every_n_steps" min="1" value="{{ experiment.config.training.log_every_n_steps }}" class="form-input">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-4">
+            <a href="/experiments/{{ experiment.id }}" class="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">Cancel</a>
+            <button type="submit" class="btn-success flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                Start Training
+            </button>
+        </div>
+    </form>
+
+    <script>
+      const pluginData = {{ lightning_plugin_classes | tojson }};
+      const pluginSelect = document.getElementById('lm_plugin_id');
+      const classSelect = document.getElementById('lm_class_name');
+      const selectedClass = {{ (experiment.lightning_module_class_name or '') | tojson }};
+
+      function populateClasses() {
+        const pid = pluginSelect.value;
+        const classes = (pluginData[pid] || []);
+        classSelect.innerHTML = '';
+        classes.forEach((c) => {
+          const opt = document.createElement('option');
+          opt.value = c;
+          opt.textContent = c;
+          if (c === selectedClass) opt.selected = true;
+          classSelect.appendChild(opt);
+        });
+      }
+
+      pluginSelect.addEventListener('change', populateClasses);
+      populateClasses();
+    </script>
+    {% else %}
     <form action="/experiments/{{ 'causal-lm' if experiment.experiment_type == 'causal_lm' else 'masked-lm' }}" method="post" class="space-y-6">
         <!-- Dataset Selection -->
         <div class="section-card">
@@ -415,5 +538,6 @@
             </button>
         </div>
     </form>
+    {% endif %}
 </div>
 {% endblock %}
