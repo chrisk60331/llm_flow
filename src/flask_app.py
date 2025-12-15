@@ -7,13 +7,22 @@ from urllib.parse import quote
 from pathlib import Path
 
 import requests
-from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, url_for
 
 # Configure Flask to find templates in src/templates
 template_dir = Path(__file__).parent / "templates"
 app = Flask(__name__, template_folder=str(template_dir))
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
+
+IMG_DIR = Path(__file__).resolve().parent.parent / "img"
+
+
+@app.route("/favicon.ico")
+def favicon():
+    resp = send_from_directory(IMG_DIR, "favicon.png", mimetype="image/png", max_age=0)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 # ============================================================================
