@@ -1,5 +1,6 @@
 # Auto Finetuner
-
+![Auto Finetuner](img/image.png "Auto Finetuner")
+## Description
 This repo includes a light-weight fine-tuning webui to experiment with
 language models with your data. The harness focuses on causal language modeling so you can
 practice:
