@@ -27,18 +27,34 @@ def save_loss_curve(
     log_history: Iterable[Mapping[str, float]],
     output_path: Path,
     title: str,
+    use_log_y: bool = True,
 ) -> Path:
     """
     Persist a Plotly HTML chart showing train/eval loss curves.
 
     Raises:
         ValueError: If no loss metrics exist in the log history.
+        ValueError: If use_log_y is True but any loss value is <= 0.
     """
 
     train_loss, eval_loss = _collect_series(log_history)
     if not train_loss and not eval_loss:
         msg = "Log history does not contain loss metrics."
         raise ValueError(msg)
+
+    if use_log_y:
+        non_positive: list[tuple[int, float]] = [
+            (step, loss)
+            for step, loss in [*train_loss, *eval_loss]
+            if loss <= 0
+        ]
+        if non_positive:
+            step, loss = non_positive[0]
+            msg = (
+                "Cannot plot loss on a log y-axis because a non-positive loss was found "
+                f"(step={step}, loss={loss})."
+            )
+            raise ValueError(msg)
     figure = go.Figure()
     if train_loss:
         figure.add_trace(
@@ -64,6 +80,8 @@ def save_loss_curve(
         yaxis_title="Loss",
         template="plotly_white",
     )
+    if use_log_y:
+        figure.update_yaxes(type="log")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     figure.write_html(str(output_path), include_plotlyjs="cdn", full_html=True)
     return output_path

@@ -106,6 +106,7 @@ def run_training(
         log_history=trainer.state.log_history,
         output_path=plot_path,
         title=f"{config.model.pretrained_model_name} MLM Loss",
+        use_log_y=True,
     )
     return trainer, {**train_metrics.metrics, **eval_metrics}
 

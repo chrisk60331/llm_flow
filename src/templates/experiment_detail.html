@@ -307,18 +307,25 @@
 <!-- Learning Curve Chart -->
 <div class="card mt-6">
     <div class="card-header">
-        <h2 class="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-            <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
-            Learning Curve
-            {% if experiment.status == 'running' or experiment.status == 'pending' or experiment.status == 'evaluating' %}
-            <span class="text-xs font-medium text-blue-600 flex items-center gap-1">
-                <span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
-                Live
-            </span>
-            {% endif %}
-        </h2>
+        <div class="flex items-center justify-between gap-4">
+            <h2 class="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+                Learning Curve
+                {% if experiment.status == 'running' or experiment.status == 'pending' or experiment.status == 'evaluating' %}
+                <span class="text-xs font-medium text-blue-600 flex items-center gap-1">
+                    <span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+                    Live
+                </span>
+                {% endif %}
+            </h2>
+            <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 select-none">
+                <input id="loss-log-y-toggle" type="checkbox" checked class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                <span>Log Y</span>
+            </label>
+        </div>
     </div>
     <div class="card-body">
+        <div id="loss-log-y-error" class="hidden mb-3 text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2"></div>
         <div id="learning-curve-chart" style="width:100%; height:400px;"></div>
     </div>
 </div>
@@ -508,10 +515,29 @@
 <script>
     let chartInitialized = false;
     const experimentType = "{{ experiment.experiment_type }}";
+    const lossLogYToggle = document.getElementById('loss-log-y-toggle');
+    if (!lossLogYToggle) {
+        throw new Error('Missing #loss-log-y-toggle element.');
+    }
+    const lossLogYError = document.getElementById('loss-log-y-error');
+    if (!lossLogYError) {
+        throw new Error('Missing #loss-log-y-error element.');
+    }
+    let lastLogs = [];
     
     function isDarkMode() {
         return document.documentElement.classList.contains('dark') || 
                window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+
+    function setLossLogYError(message) {
+        lossLogYError.textContent = message;
+        lossLogYError.classList.remove('hidden');
+    }
+
+    function clearLossLogYError() {
+        lossLogYError.textContent = '';
+        lossLogYError.classList.add('hidden');
     }
     
     function getChartLayout() {
@@ -536,7 +562,8 @@
                 color: dark ? '#9ca3af' : '#6b7280',
                 gridcolor: dark ? '#374151' : '#e5e7eb',
                 zerolinecolor: dark ? '#4b5563' : '#d1d5db',
-                side: 'left'
+                side: 'left',
+                type: lossLogYToggle.checked ? 'log' : 'linear'
             },
             yaxis2: {
                 title: 'Learning Rate',
@@ -558,6 +585,7 @@
     }
     
     function initOrUpdateChart(logs) {
+        lastLogs = logs;
         const trainLoss = [];
         const evalLoss = [];
         const testLoss = [];
@@ -602,6 +630,26 @@
             }
             return;
         }
+
+        if (lossLogYToggle.checked) {
+            const allLoss = [...trainLoss, ...evalLoss, ...testLoss];
+            const nonPositive = allLoss.find(p => p.y <= 0);
+            if (nonPositive) {
+                setLossLogYError(
+                    'Cannot render loss on a log y-axis because a non-positive loss was found. ' +
+                    'Uncheck “Log Y” to view the chart.'
+                );
+                if (chartInitialized) {
+                    Plotly.purge('learning-curve-chart');
+                    chartInitialized = false;
+                }
+                document.getElementById('learning-curve-chart').innerHTML =
+                    '<p class="text-center text-gray-500 dark:text-gray-400 py-8">Log scale requires all loss values to be > 0. Uncheck “Log Y” to view the chart.</p>';
+                return;
+            }
+        }
+
+        clearLossLogYError();
         
         const traces = [];
         if (trainLoss.length > 0) {
@@ -680,12 +728,17 @@
         }));
         
         if (!chartInitialized) {
+            document.getElementById('learning-curve-chart').innerHTML = '';
             Plotly.newPlot('learning-curve-chart', traces, layout, {responsive: true});
             chartInitialized = true;
         } else {
             Plotly.react('learning-curve-chart', traces, layout);
         }
     }
+
+    lossLogYToggle.addEventListener('change', () => {
+        initOrUpdateChart(lastLogs);
+    });
     
     // Listen for dark mode changes
     const darkModeObserver = new MutationObserver(() => {
