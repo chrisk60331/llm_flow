@@ -114,7 +114,7 @@ def run_llm_training(
         mlm=False,
     )
     logs_path = config.training.output_dir / "training_logs.json"
-    callbacks = [StreamingLogsCallback(logs_path)]
+    callbacks = [StreamingLogsCallback(logs_path, experiment_id=experiment_id)]
     if config.training.early_stopping_patience is not None:
         callbacks.append(
             EarlyStoppingCallback(

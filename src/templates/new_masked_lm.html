@@ -27,12 +27,13 @@
                 <h2 class="section-title">Use Saved Config</h2>
             </div>
             <div class="section-body">
-                <select name="config_id" class="form-select">
+                <select name="config_id" id="config-select" class="form-select" onchange="loadConfig(this.value)">
                     <option value="">-- Create new config below --</option>
                     {% for cfg in configs %}
                     <option value="{{ cfg.id }}">{{ cfg.name }} ({{ cfg.config.model.pretrained_model_name }})</option>
                     {% endfor %}
                 </select>
+                <p id="config-loading" class="text-sm text-blue-500 mt-2 hidden">Loading config...</p>
             </div>
         </div>
         {% endif %}
@@ -196,4 +197,81 @@
         </div>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadConfig(configId) {
+    if (!configId) return;
+    
+    const loading = document.getElementById('config-loading');
+    loading.classList.remove('hidden');
+    
+    try {
+        const resp = await fetch('/api/configs/' + configId);
+        if (!resp.ok) throw new Error('Failed to load config');
+        const data = await resp.json();
+        const cfg = data.config;
+        
+        // Data config
+        if (cfg.data) {
+            setVal('text_fields', (cfg.data.text_fields || []).join(','));
+            setVal('separator', cfg.data.separator);
+            setVal('max_length', cfg.data.max_length);
+            setVal('validation_split', cfg.data.validation_split);
+            setVal('seed', cfg.data.seed);
+        }
+        
+        // Model config
+        if (cfg.model) {
+            setVal('pretrained_model_name', cfg.model.pretrained_model_name);
+            setVal('freeze_encoder_layers', cfg.model.freeze_encoder_layers);
+            setCheck('freeze_embedding', cfg.model.freeze_embedding);
+        }
+        
+        // Training config
+        if (cfg.training) {
+            setVal('num_train_epochs', cfg.training.num_train_epochs);
+            setVal('max_steps', cfg.training.max_steps);
+            setVal('learning_rate', cfg.training.learning_rate);
+            setVal('weight_decay', cfg.training.weight_decay);
+            setVal('per_device_train_batch_size', cfg.training.per_device_train_batch_size);
+            setVal('per_device_eval_batch_size', cfg.training.per_device_eval_batch_size);
+            setVal('gradient_accumulation_steps', cfg.training.gradient_accumulation_steps);
+            setVal('warmup_ratio', cfg.training.warmup_ratio);
+            setVal('logging_steps', cfg.training.logging_steps);
+            setVal('eval_steps', cfg.training.eval_steps);
+            setVal('save_steps', cfg.training.save_steps);
+            setVal('save_total_limit', cfg.training.save_total_limit);
+            setVal('early_stopping_patience', cfg.training.early_stopping_patience);
+            setVal('early_stopping_metric', cfg.training.early_stopping_metric);
+        }
+        
+        loading.textContent = 'Config loaded!';
+        loading.classList.remove('text-blue-500');
+        loading.classList.add('text-emerald-500');
+        setTimeout(() => loading.classList.add('hidden'), 2000);
+        
+    } catch (err) {
+        loading.textContent = 'Error loading config';
+        loading.classList.remove('text-blue-500');
+        loading.classList.add('text-red-500');
+        console.error(err);
+    }
+}
+
+function setVal(name, value) {
+    const el = document.querySelector(`[name="${name}"]`);
+    if (el && value !== undefined && value !== null) {
+        el.value = value;
+    }
+}
+
+function setCheck(name, value) {
+    const el = document.querySelector(`[name="${name}"]`);
+    if (el) {
+        el.checked = !!value;
+    }
+}
+</script>
 {% endblock %}

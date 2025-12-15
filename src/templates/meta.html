@@ -55,13 +55,13 @@
         </div>
         <div class="section-body">
             <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Train GBM predictor on stored meta-features ({{ meta_features_count }} available).</p>
-            <form action="/meta/train" method="post">
+            <div>
                 <label class="flex items-center gap-2 mb-3">
-                    <input type="checkbox" name="include_synthetic" checked class="form-checkbox">
+                    <input type="checkbox" id="include-synthetic" checked class="form-checkbox">
                     <span class="text-sm text-gray-700 dark:text-gray-300">Include synthetic data</span>
                 </label>
-                <button type="submit" class="btn-success" {% if meta_features_count < 5 %}disabled title="Need 5+ features"{% endif %}>Train Predictor</button>
-            </form>
+                <button onclick="startTraining()" class="btn-success" {% if meta_features_count < 5 %}disabled title="Need 5+ features"{% endif %}>Train Predictor</button>
+            </div>
         </div>
     </div>
     
@@ -248,6 +248,129 @@
         {% endif %}
     </div>
 </div>
+
+<!-- Training Modal -->
+<div id="train-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden">
+        <!-- Loading State -->
+        <div id="train-loading">
+            <div class="bg-blue-500 px-6 py-4">
+                <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <svg class="w-6 h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Training Predictor...
+                </h3>
+            </div>
+            <div class="px-6 py-8 text-center">
+                <div class="inline-block w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p class="text-gray-600 dark:text-gray-300">Training GBM model with cross-validation...</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">This may take a few seconds</p>
+            </div>
+        </div>
+        <!-- Results State -->
+        <div id="train-results" class="hidden">
+            <div class="bg-emerald-500 px-6 py-4">
+                <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Predictor Training Complete
+                </h3>
+            </div>
+            <div class="px-6 py-4">
+                <p id="train-message" class="text-gray-600 dark:text-gray-300 mb-4"></p>
+                <div class="grid grid-cols-2 gap-4 text-center">
+                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">CV RMSE</p>
+                        <p class="text-xl font-bold text-blue-600 dark:text-blue-400"><span id="train-rmse"></span> <span id="train-rmse-std" class="text-sm font-normal text-gray-400"></span></p>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">Best Iteration</p>
+                        <p id="train-iterations" class="text-xl font-bold text-emerald-600 dark:text-emerald-400"></p>
+                    </div>
+                </div>
+                <p id="train-explanation" class="text-xs text-gray-500 dark:text-gray-400 mt-4 text-center"></p>
+            </div>
+            <div class="px-6 py-3 bg-gray-50 dark:bg-gray-700 flex justify-end">
+                <button onclick="closeTrainModal()" class="btn-primary">Got it</button>
+            </div>
+        </div>
+        <!-- Error State -->
+        <div id="train-error" class="hidden">
+            <div class="bg-red-500 px-6 py-4">
+                <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Training Failed
+                </h3>
+            </div>
+            <div class="px-6 py-4">
+                <p id="train-error-message" class="text-gray-600 dark:text-gray-300"></p>
+            </div>
+            <div class="px-6 py-3 bg-gray-50 dark:bg-gray-700 flex justify-end">
+                <button onclick="closeTrainModal()" class="btn-primary">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function startTraining() {
+    const modal = document.getElementById('train-modal');
+    const loading = document.getElementById('train-loading');
+    const results = document.getElementById('train-results');
+    const error = document.getElementById('train-error');
+    
+    // Show modal with loading state
+    modal.classList.remove('hidden');
+    loading.classList.remove('hidden');
+    results.classList.add('hidden');
+    error.classList.add('hidden');
+    
+    const includeSynthetic = document.getElementById('include-synthetic').checked;
+    
+    fetch('/api/meta/train-predictor', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({include_synthetic: includeSynthetic})
+    })
+    .then(resp => {
+        if (!resp.ok) return resp.json().then(d => Promise.reject(d));
+        return resp.json();
+    })
+    .then(data => {
+        loading.classList.add('hidden');
+        results.classList.remove('hidden');
+        
+        const metrics = data.metrics || {};
+        const rmse = metrics.train_rmse?.toFixed(2) || '0';
+        const rmseStd = metrics.train_rmse_std?.toFixed(2) || '0';
+        
+        document.getElementById('train-message').textContent = data.message || '';
+        document.getElementById('train-rmse').textContent = rmse;
+        document.getElementById('train-rmse-std').textContent = `± ${rmseStd}`;
+        document.getElementById('train-iterations').textContent = Math.round(metrics.best_iteration || 0);
+        document.getElementById('train-explanation').textContent = `RMSE ~${rmse} means predictions are typically within ±${rmse} points of actual scores.`;
+    })
+    .catch(err => {
+        loading.classList.add('hidden');
+        error.classList.remove('hidden');
+        document.getElementById('train-error-message').textContent = err.detail || err.message || 'An error occurred';
+    });
+}
+
+function closeTrainModal() {
+    document.getElementById('train-modal').classList.add('hidden');
+    // Reload to update predictor status
+    window.location.reload();
+}
+
+// Close on escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeTrainModal();
+});
+
+// Close on backdrop click
+document.getElementById('train-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeTrainModal();
+});
+</script>
 
 <script>
 // Populate filter dropdowns from table data

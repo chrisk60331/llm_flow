@@ -620,6 +620,17 @@ def meta_page():
     except Exception:
         pass
     
+    # Check for training results from redirect
+    train_results = None
+    if request.args.get("train_success"):
+        train_results = {
+            "message": request.args.get("train_message", ""),
+            "rmse": request.args.get("train_rmse", ""),
+            "rmse_std": request.args.get("train_rmse_std", ""),
+            "iterations": request.args.get("train_iterations", ""),
+            "samples": request.args.get("train_samples", ""),
+        }
+    
     return render_template(
         "meta.html",
         meta_features=meta_features,
@@ -628,6 +639,7 @@ def meta_page():
         synthetic_count=synthetic_count,
         real_count=real_count,
         autotune_jobs=autotune_jobs,
+        train_results=train_results,
     )
 
 
@@ -671,7 +683,18 @@ def meta_probe_submit():
 @app.route("/meta/train", methods=["POST"])
 def meta_train():
     include_synthetic = "include_synthetic" in request.form
-    requests.post(f"{API_BASE_URL}/meta/train-predictor", json={"include_synthetic": include_synthetic}, timeout=60)
+    resp = requests.post(f"{API_BASE_URL}/meta/train-predictor", json={"include_synthetic": include_synthetic}, timeout=60)
+    if resp.status_code == 200:
+        data = resp.json()
+        metrics = data.get("metrics", {})
+        return redirect(url_for("meta_page", 
+            train_success="1",
+            train_message=data.get("message", ""),
+            train_rmse=f"{metrics.get('train_rmse', 0):.2f}",
+            train_rmse_std=f"{metrics.get('train_rmse_std', 0):.2f}",
+            train_iterations=int(metrics.get('best_iteration', 0)),
+            train_samples=int(metrics.get('num_samples', 0)),
+        ))
     return redirect(url_for("meta_page"))
 
 
@@ -760,10 +783,13 @@ def api_health():
     return jsonify(resp.json())
 
 
-@app.route("/api/configs/<config_name>")
-def api_config_detail(config_name: str):
-    resp = requests.get(f"{API_BASE_URL}/configs/by-name/{config_name}", timeout=10)
-    return jsonify(resp.json())
+@app.route("/api/configs/<config_id>")
+def api_config_detail(config_id: str):
+    # Try by ID first (UUID format), fallback to by-name
+    resp = requests.get(f"{API_BASE_URL}/configs/{config_id}", timeout=10)
+    if resp.status_code == 404:
+        resp = requests.get(f"{API_BASE_URL}/configs/by-name/{config_id}", timeout=10)
+    return jsonify(resp.json()), resp.status_code
 
 
 @app.route("/api/experiments/<experiment_id>")
@@ -778,6 +804,13 @@ def api_experiment_logs(experiment_id: str):
     data = resp.json()
     # Return just the logs array for easier consumption by frontend
     return jsonify(data.get("logs", []))
+
+
+@app.route("/api/experiments/<experiment_id>/progress")
+def api_experiment_progress(experiment_id: str):
+    """Get live training progress updated every step."""
+    resp = requests.get(f"{API_BASE_URL}/experiments/{experiment_id}/progress", timeout=10)
+    return jsonify(resp.json()), resp.status_code
 
 
 @app.route("/api/experiments/<experiment_id>/stop", methods=["POST"])
@@ -815,6 +848,13 @@ def api_autotune_status(job_id: str):
 def api_autotune_list():
     resp = requests.get(f"{API_BASE_URL}/autotune", timeout=10)
     return jsonify(resp.json())
+
+
+@app.route("/api/meta/train-predictor", methods=["POST"])
+def api_meta_train_predictor():
+    payload = request.get_json()
+    resp = requests.post(f"{API_BASE_URL}/meta/train-predictor", json=payload, timeout=120)
+    return jsonify(resp.json()), resp.status_code
 
 
 @app.route("/api/datasets/<dataset_id>/row/<int:row_idx>")

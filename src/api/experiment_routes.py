@@ -8,7 +8,7 @@ from threading import Thread
 
 from fastapi import APIRouter, HTTPException
 
-from ..callbacks import stop_registry
+from ..callbacks import stop_registry, progress_registry
 from ..config import DataConfig, ExperimentConfig, ModelConfig, TrainingConfig
 from ..llm_config import (
     LLMDataConfig,
@@ -363,6 +363,20 @@ def get_experiment_by_id(experiment_id: str) -> ExperimentResult:
     if not exp:
         raise HTTPException(status_code=404, detail="Experiment not found")
     return exp
+
+
+@router.get("/experiments/{experiment_id}/progress")
+def get_experiment_progress(experiment_id: str) -> dict:
+    """Get live training progress for an experiment (updated every step)."""
+    exp = get_experiment(experiment_id)
+    if not exp:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    progress = progress_registry.get(experiment_id, {})
+    return {
+        "global_step": progress.get("global_step", 0),
+        "epoch": progress.get("epoch", 0),
+        "max_steps": progress.get("max_steps", 0),
+    }
 
 
 @router.get("/experiments/{experiment_id}/logs")

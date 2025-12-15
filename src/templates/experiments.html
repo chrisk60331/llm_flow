@@ -20,43 +20,105 @@
     </div>
 </div>
 
+<!-- Filters -->
+<div class="mb-4 grid grid-cols-2 md:grid-cols-6 gap-3">
+    <div>
+        <label class="form-label text-xs">Search</label>
+        <input type="text" id="exp-search" placeholder="ID or config..." class="form-input" onkeyup="filterExperiments()">
+    </div>
+    <div>
+        <label class="form-label text-xs">Type</label>
+        <select id="filter-type" class="form-select w-full" onchange="filterExperiments()">
+            <option value="">All</option>
+            <option value="causal_lm">Causal LM</option>
+            <option value="masked_lm">Masked LM</option>
+        </select>
+    </div>
+    <div>
+        <label class="form-label text-xs">Config</label>
+        <select id="filter-config" class="form-select w-full" onchange="filterExperiments()">
+            <option value="">All</option>
+        </select>
+    </div>
+    <div>
+        <label class="form-label text-xs">Dataset</label>
+        <select id="filter-dataset" class="form-select w-full" onchange="filterExperiments()">
+            <option value="">All</option>
+        </select>
+    </div>
+    <div>
+        <label class="form-label text-xs">Status</label>
+        <select id="filter-status" class="form-select w-full" onchange="filterExperiments()">
+            <option value="">All</option>
+        </select>
+    </div>
+    <div>
+        <label class="form-label text-xs">Has Loss</label>
+        <select id="filter-loss" class="form-select w-full" onchange="filterExperiments()">
+            <option value="">All</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+        </select>
+    </div>
+</div>
+
 <div class="card">
     <div class="overflow-x-auto">
-        <table class="w-full">
+        <table class="w-full" id="experiments-table">
             <thead>
                 <tr class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">ID</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Type</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Config</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Dataset</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Started</th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Eval Loss</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(0, 'string')">
+                        <div class="flex items-center gap-1">ID <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(1, 'string')">
+                        <div class="flex items-center gap-1">Type <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(2, 'string')">
+                        <div class="flex items-center gap-1">Config <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(3, 'string')">
+                        <div class="flex items-center gap-1">Dataset <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(4, 'string')">
+                        <div class="flex items-center gap-1">Status <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(5, 'date')">
+                        <div class="flex items-center gap-1">Started <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(6, 'number')">
+                        <div class="flex items-center justify-center gap-1">Eval Loss <span class="sort-icon">↕</span></div>
+                    </th>
                     <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-700" id="experiments-tbody">
                 {% for exp in experiments %}
-                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors">
-                    <td class="px-4 py-3">
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors exp-row"
+                    data-id="{{ exp.id }}"
+                    data-type="{{ exp.experiment_type }}"
+                    data-config="{{ exp.config_name or '' }}"
+                    data-dataset="{{ exp.dataset_filename or '' }}"
+                    data-status="{{ exp.status }}"
+                    data-has-loss="{{ 'yes' if exp.metrics and exp.metrics.eval_loss is defined else 'no' }}">
+                    <td class="px-4 py-3" data-value="{{ exp.id }}">
                         <a href="/experiments/{{ exp.id }}" class="text-sm font-mono text-primary-600 hover:text-primary-800">{{ exp.id[:8] }}...</a>
                     </td>
-                    <td class="px-4 py-3">
+                    <td class="px-4 py-3" data-value="{{ exp.experiment_type }}">
                         {% if exp.experiment_type == 'causal_lm' %}
                         <span class="badge badge-green">Causal LM</span>
                         {% else %}
                         <span class="badge badge-blue">Masked LM</span>
                         {% endif %}
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                    <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-100" data-value="{{ exp.config_name or '' }}">
                         {% if exp.config_name %}
                         <a href="/configs/{{ exp.config_id }}" class="hover:text-primary-600">{{ exp.config_name }}</a>
                         {% else %}
                         <span class="text-gray-400">-</span>
                         {% endif %}
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ exp.dataset_filename or '-' }}</td>
-                    <td class="px-4 py-3">
+                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400" data-value="{{ exp.dataset_filename or '' }}">{{ exp.dataset_filename or '-' }}</td>
+                    <td class="px-4 py-3" data-value="{{ exp.status }}">
                         {% if exp.status == 'completed' %}
                         <span class="badge badge-green">completed</span>
                         {% elif exp.status == 'running' %}
@@ -71,10 +133,10 @@
                         <span class="badge badge-gray">{{ exp.status }}</span>
                         {% endif %}
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                    <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400" data-value="{{ exp.started_at }}">
                         <span data-utc="{{ exp.started_at }}">{{ exp.started_at }}</span>
                     </td>
-                    <td class="px-4 py-3 text-center text-sm">
+                    <td class="px-4 py-3 text-center text-sm" data-value="{{ exp.metrics.eval_loss if exp.metrics and exp.metrics.eval_loss is defined else 999 }}">
                         {% if exp.metrics and exp.metrics.eval_loss is defined %}
                         <span class="font-mono text-amber-600 dark:text-amber-400">{{ "%.4f"|format(exp.metrics.eval_loss) }}</span>
                         {% else %}
@@ -84,9 +146,7 @@
                     <td class="px-4 py-3 text-right">
                         <div class="flex items-center justify-end gap-2">
                             <a href="/experiments/{{ exp.id }}" class="text-sm font-medium text-primary-600 hover:text-primary-800">View</a>
-                            {% if exp.status == 'completed' %}
                             <a href="/experiments/{{ exp.id }}/copy" class="text-sm font-medium text-emerald-600 hover:text-emerald-800">Copy</a>
-                            {% endif %}
                             {% if exp.status == 'running' %}
                             <form action="/experiments/{{ exp.id }}/stop" method="post" class="inline">
                                 <button type="submit" class="text-sm font-medium text-amber-600 hover:text-amber-800">Stop</button>
@@ -112,5 +172,132 @@
         </table>
     </div>
 </div>
+
+<p id="exp-count" class="text-sm text-gray-500 dark:text-gray-400 mt-4 text-center">Showing {{ experiments | length }} experiments</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Populate filter dropdowns from table data
+document.addEventListener('DOMContentLoaded', function() {
+    const rows = document.querySelectorAll('.exp-row');
+    const configValues = new Set();
+    const datasetValues = new Set();
+    const statusValues = new Set();
+    
+    rows.forEach(row => {
+        if (row.dataset.config) configValues.add(row.dataset.config);
+        if (row.dataset.dataset) datasetValues.add(row.dataset.dataset);
+        if (row.dataset.status) statusValues.add(row.dataset.status);
+    });
+    
+    populateSelect('filter-config', Array.from(configValues).sort());
+    populateSelect('filter-dataset', Array.from(datasetValues).sort());
+    populateSelect('filter-status', Array.from(statusValues).sort());
+});
+
+function populateSelect(id, values) {
+    const select = document.getElementById(id);
+    if (!select) return;
+    values.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        select.appendChild(opt);
+    });
+}
+
+function filterExperiments() {
+    const search = document.getElementById('exp-search').value.toLowerCase();
+    const typeFilter = document.getElementById('filter-type').value;
+    const configFilter = document.getElementById('filter-config').value;
+    const datasetFilter = document.getElementById('filter-dataset').value;
+    const statusFilter = document.getElementById('filter-status').value;
+    const lossFilter = document.getElementById('filter-loss').value;
+    const rows = document.querySelectorAll('.exp-row');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        let match = true;
+        
+        // Search filter
+        if (search) {
+            const id = row.dataset.id.toLowerCase();
+            const config = row.dataset.config.toLowerCase();
+            if (!id.includes(search) && !config.includes(search)) match = false;
+        }
+        
+        // Type filter
+        if (match && typeFilter && row.dataset.type !== typeFilter) match = false;
+        
+        // Config filter
+        if (match && configFilter && row.dataset.config !== configFilter) match = false;
+        
+        // Dataset filter
+        if (match && datasetFilter && row.dataset.dataset !== datasetFilter) match = false;
+        
+        // Status filter
+        if (match && statusFilter && row.dataset.status !== statusFilter) match = false;
+        
+        // Loss filter
+        if (match && lossFilter && row.dataset.hasLoss !== lossFilter) match = false;
+        
+        row.style.display = match ? '' : 'none';
+        if (match) visibleCount++;
+    });
+    
+    document.getElementById('exp-count').textContent = `Showing ${visibleCount} of {{ experiments | length }} experiments`;
+}
+
+let sortColumn = -1;
+let sortAsc = true;
+
+function sortTable(colIndex, type) {
+    const table = document.getElementById('experiments-table');
+    const tbody = document.getElementById('experiments-tbody');
+    const rows = Array.from(tbody.querySelectorAll('.exp-row'));
+    
+    if (sortColumn === colIndex) {
+        sortAsc = !sortAsc;
+    } else {
+        sortColumn = colIndex;
+        sortAsc = true;
+    }
+    
+    rows.sort((a, b) => {
+        const aCell = a.cells[colIndex];
+        const bCell = b.cells[colIndex];
+        let aVal = aCell.dataset.value || aCell.textContent.trim();
+        let bVal = bCell.dataset.value || bCell.textContent.trim();
+        
+        if (type === 'number') {
+            aVal = parseFloat(aVal) || 0;
+            bVal = parseFloat(bVal) || 0;
+            return sortAsc ? aVal - bVal : bVal - aVal;
+        } else if (type === 'date') {
+            aVal = new Date(aVal).getTime() || 0;
+            bVal = new Date(bVal).getTime() || 0;
+            return sortAsc ? aVal - bVal : bVal - aVal;
+        } else {
+            return sortAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        }
+    });
+    
+    rows.forEach(row => tbody.appendChild(row));
+    
+    // Update sort icons
+    const headers = table.querySelectorAll('th');
+    headers.forEach((th, i) => {
+        const icon = th.querySelector('.sort-icon');
+        if (icon) {
+            if (i === colIndex) {
+                icon.textContent = sortAsc ? '↑' : '↓';
+            } else {
+                icon.textContent = '↕';
+            }
+        }
+    });
+}
+</script>
 {% endblock %}
 

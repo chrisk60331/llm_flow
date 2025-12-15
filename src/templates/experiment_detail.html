@@ -246,7 +246,7 @@
         <h2 class="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
             <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
             Learning Curve
-            {% if experiment.status == 'running' or experiment.status == 'pending' %}
+            {% if experiment.status == 'running' or experiment.status == 'pending' or experiment.status == 'evaluating' %}
             <span class="text-xs font-medium text-blue-600 flex items-center gap-1">
                 <span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
                 Live
@@ -265,7 +265,7 @@
         <h2 class="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
             <svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
             Training Logs
-            {% if experiment.status == 'running' or experiment.status == 'pending' %}
+            {% if experiment.status == 'running' or experiment.status == 'pending' or experiment.status == 'evaluating' %}
             <span id="logs-status" class="ml-2 text-xs font-medium text-blue-600 flex items-center gap-1">
                 <span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
                 Live
@@ -581,7 +581,7 @@
     {% endif %}
 </script>
 
-{% if experiment.status == 'running' or experiment.status == 'pending' %}
+{% if experiment.status == 'running' or experiment.status == 'pending' or experiment.status == 'evaluating' %}
 <script>
     const experimentId = "{{ experiment.id }}";
     const totalEpochs = {{ experiment.config.training.num_train_epochs }};
@@ -597,7 +597,7 @@
             }
             const data = await resp.json();
             console.log('Status poll:', data.status);
-            if (data.status !== 'running' && data.status !== 'pending') {
+            if (data.status !== 'running' && data.status !== 'pending' && data.status !== 'evaluating') {
                 console.log('Experiment finished, reloading...');
                 window.location.reload();
             }
@@ -666,6 +666,29 @@
         }
     }
     
+    async function pollProgress() {
+        // Get real-time progress updated every step
+        try {
+            const resp = await fetch('/api/experiments/' + experimentId + '/progress');
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (data.epoch !== undefined && data.epoch > 0) {
+                const progressBar = document.getElementById('progress-bar');
+                const progressText = document.getElementById('progress-text');
+                const progressEpoch = document.getElementById('progress-epoch');
+                const progressStep = document.getElementById('progress-step');
+                
+                const pct = Math.min(100, (data.epoch / totalEpochs) * 100);
+                if (progressBar) progressBar.style.width = pct + '%';
+                if (progressText) progressText.textContent = pct.toFixed(0) + '%';
+                if (progressEpoch) progressEpoch.textContent = 'Epoch: ' + data.epoch.toFixed(2) + ' / ' + totalEpochs;
+                if (progressStep) progressStep.textContent = 'Step: ' + data.global_step + ' / ' + data.max_steps;
+            }
+        } catch (e) {
+            // Silent fail - logs poll will still work
+        }
+    }
+    
     function updateLogsTable(logs) {
         const tbody = document.getElementById('logs-table-body');
         tbody.innerHTML = '';
@@ -728,7 +751,7 @@
                 try {
                     const resp = await fetch('/api/experiments/' + experimentId);
                     const data = await resp.json();
-                    if (data.status !== 'running' && data.status !== 'pending') {
+                    if (data.status !== 'running' && data.status !== 'pending' && data.status !== 'evaluating') {
                         clearInterval(stopPollingInterval);
                         btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Stopped!';
                         setTimeout(() => window.location.reload(), 1000);
@@ -749,9 +772,11 @@
     // Start polling immediately and then at intervals
     console.log('Starting live polling for experiment:', experimentId);
     pollLogs();
+    pollProgress();
     pollStatus();
     setInterval(pollStatus, 5000);
     setInterval(pollLogs, 2000);
+    setInterval(pollProgress, 1000);  // Progress updates every second for real-time feel
 </script>
 {% endif %}
 
