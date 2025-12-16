@@ -3,105 +3,193 @@
 {% block title %}Meta-Learning - EvalLedger{% endblock %}
 
 {% block content %}
-<div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Meta-Learning Dashboard</h1>
-    <p class="text-gray-600 dark:text-gray-400">Predict and optimize model performance before training</p>
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Meta-Learning Dashboard</h1>
+        <p class="text-gray-600 dark:text-gray-400">Predict and optimize model performance before training</p>
+    </div>
+    <div class="flex items-center gap-2">
+        <button onclick="openModal('synthetic-modal')" class="btn-secondary flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+            Generate
+        </button>
+        <button onclick="openModal('train-modal')" class="btn-success flex items-center gap-2" {% if meta_features_count < 5 %}disabled title="Need 5+ features"{% endif %}>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+            Train
+        </button>
+        <button onclick="openModal('actions-modal')" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" title="More actions">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+        </button>
+    </div>
 </div>
 
-<!-- Quick Actions -->
-<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+<!-- Stats Row -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
     <div class="metric-card">
         <div class="metric-label">Meta Features</div>
         <div class="metric-value">{{ meta_features_count }}</div>
     </div>
     <div class="metric-card">
-        <div class="metric-label">Synthetic Features</div>
+        <div class="metric-label">Synthetic</div>
         <div class="metric-value">{{ synthetic_count }}</div>
     </div>
     <div class="metric-card">
-        <div class="metric-label">Real Features</div>
+        <div class="metric-label">Real</div>
         <div class="metric-value">{{ real_count }}</div>
     </div>
     <div class="metric-card">
-        <div class="metric-label">Predictor Status</div>
+        <div class="metric-label">Predictor</div>
         <div class="text-lg font-semibold {% if predictor_trained %}text-emerald-600 dark:text-emerald-400{% else %}text-gray-400{% endif %}">
             {{ 'Trained' if predictor_trained else 'Not Trained' }}
         </div>
     </div>
 </div>
 
-<!-- Actions Row -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <!-- Generate Synthetic -->
-    <div class="section-card">
-        <div class="section-header">
-            <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-            <h3 class="section-title">Generate Synthetic Data</h3>
-        </div>
-        <div class="section-body">
-            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Bootstrap the predictor with synthetic training data based on domain knowledge.</p>
-            <form action="/meta/generate-synthetic" method="post" class="flex gap-2">
-                <input type="number" name="n_samples" value="100" min="10" max="500" class="form-input w-24">
-                <button type="submit" class="btn-primary">Generate</button>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Train Predictor -->
-    <div class="section-card">
-        <div class="section-header">
-            <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
-            <h3 class="section-title">Train Predictor</h3>
-        </div>
-        <div class="section-body">
-            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Train GBM predictor on stored meta-features ({{ meta_features_count }} available).</p>
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body py-3">
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
             <div>
-                <label class="flex items-center gap-2 mb-3">
-                    <input type="checkbox" id="include-synthetic" checked class="form-checkbox">
-                    <span class="text-sm text-gray-700 dark:text-gray-300">Include synthetic data</span>
-                </label>
-                <button onclick="startTraining()" class="btn-success" {% if meta_features_count < 5 %}disabled title="Need 5+ features"{% endif %}>Train Predictor</button>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Type</label>
+                <select id="filter-type" class="form-select text-sm py-1.5" onchange="applyFilters()">
+                    <option value="">All</option>
+                    <option value="synthetic">Synthetic</option>
+                    <option value="real">Real</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Learning Rate</label>
+                <select id="filter-lr" class="form-select text-sm py-1.5" onchange="applyFilters()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">LoRA r</label>
+                <select id="filter-lora" class="form-select text-sm py-1.5" onchange="applyFilters()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Model</label>
+                <select id="filter-model" class="form-select text-sm py-1.5" onchange="applyFilters()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Batch Size</label>
+                <select id="filter-batch" class="form-select text-sm py-1.5" onchange="applyFilters()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">ROUGE Min</label>
+                <input type="number" id="filter-rouge-min" placeholder="0" step="0.1" class="form-input text-sm py-1.5" oninput="applyFilters()">
             </div>
         </div>
-    </div>
-    
-    <!-- Clear Synthetic -->
-    <div class="section-card">
-        <div class="section-header">
-            <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-            <h3 class="section-title">Clear Synthetic Data</h3>
-        </div>
-        <div class="section-body">
-            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Remove all synthetic features from storage. Keep only real experiment data.</p>
-            <form action="/meta/clear-synthetic" method="post" onsubmit="return confirm('Remove all synthetic features?')">
-                <button type="submit" class="btn-danger">Clear Synthetic</button>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Backfill ROUGE -->
-    <div class="section-card">
-        <div class="section-header">
-            <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-            <h3 class="section-title">Backfill ROUGE-L</h3>
-        </div>
-        <div class="section-body">
-            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Populate missing ROUGE-L scores from existing benchmark evaluations.</p>
-            <form action="/meta/backfill-rouge" method="post">
-                <button type="submit" class="btn-primary">Backfill Scores</button>
-            </form>
+        <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+            <span id="filter-count" class="text-sm text-gray-500 dark:text-gray-400"></span>
+            <button onclick="clearFilters()" class="text-sm text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 font-medium">Clear Filters</button>
         </div>
     </div>
 </div>
 
-<!-- AutoTune Section -->
-<div class="section-card mb-6">
-    <div class="section-header">
-        <svg class="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-        <h3 class="section-title">AutoTune Jobs</h3>
+<!-- Meta Features Table -->
+<div class="card">
+    <div class="overflow-x-auto">
+        <table class="w-full" id="meta-table">
+            <thead>
+                <tr class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(0, 'string')">
+                        <div class="flex items-center gap-1">Experiment ID <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(1, 'string')">
+                        <div class="flex items-center justify-center gap-1">Type <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(2, 'number')">
+                        <div class="flex items-center justify-center gap-1">LR <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(3, 'number')">
+                        <div class="flex items-center justify-center gap-1">LoRA r <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(4, 'string')">
+                        <div class="flex items-center justify-center gap-1">Model <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(5, 'number')">
+                        <div class="flex items-center justify-center gap-1">Batch <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(6, 'number')">
+                        <div class="flex items-center justify-center gap-1">Final Loss <span class="sort-icon">↕</span></div>
+                    </th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(7, 'number')">
+                        <div class="flex items-center justify-center gap-1">ROUGE-L <span class="sort-icon">↕</span></div>
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-700" id="meta-tbody">
+                {% for f in meta_features %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors meta-row"
+                    data-type="{{ 'synthetic' if f.is_synthetic else 'real' }}"
+                    data-lr="{{ f.learning_rate or '' }}"
+                    data-lora="{{ f.lora_r or '' }}"
+                    data-model="{{ f.model_name or '' }}"
+                    data-batch="{{ f.batch_size or '' }}"
+                    data-rouge="{{ f.final_rouge_score if f.final_rouge_score and f.final_rouge_score > 0 else (f.final_bleu_score or 0) }}">
+                    <td class="px-4 py-3 font-mono text-sm" data-value="{{ f.experiment_id }}">{{ f.experiment_id[:16] }}...</td>
+                    <td class="px-4 py-3 text-center" data-value="{{ 'synthetic' if f.is_synthetic else 'real' }}">
+                        {% if f.is_synthetic %}
+                        <span class="badge badge-purple">synthetic</span>
+                        {% else %}
+                        <span class="badge badge-blue">real</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-center font-mono text-sm" data-value="{{ f.learning_rate or 0 }}">{{ "%.0e"|format(f.learning_rate) if f.learning_rate else '-' }}</td>
+                    <td class="px-4 py-3 text-center" data-value="{{ f.lora_r or 0 }}">{{ f.lora_r or '-' }}</td>
+                    <td class="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-400" data-value="{{ f.model_name or '' }}">{{ (f.model_name or '-').split('/') | last | truncate(20) }}</td>
+                    <td class="px-4 py-3 text-center" data-value="{{ f.batch_size or 0 }}">{{ f.batch_size or '-' }}</td>
+                    <td class="px-4 py-3 text-center font-mono text-sm text-amber-600 dark:text-amber-400" data-value="{{ f.final_eval_loss or 999 }}">{{ "%.4f"|format(f.final_eval_loss) if f.final_eval_loss else '-' }}</td>
+                    <td class="px-4 py-3 text-center font-mono text-sm text-emerald-600 dark:text-emerald-400" data-value="{{ f.final_rouge_score if f.final_rouge_score and f.final_rouge_score > 0 else (f.final_bleu_score or -1) }}">
+                        {% if f.final_rouge_score and f.final_rouge_score > 0 %}
+                        {{ "%.2f"|format(f.final_rouge_score) }}
+                        {% elif f.final_bleu_score and f.final_bleu_score > 0 %}
+                        <span class="text-blue-500" title="BLEU (no ROUGE available)">{{ "%.2f"|format(f.final_bleu_score) }}*</span>
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr id="empty-row">
+                    <td colspan="8" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        <div class="flex flex-col items-center">
+                            <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path></svg>
+                            <p>No meta-features stored yet</p>
+                            <button onclick="openModal('synthetic-modal')" class="mt-3 text-primary-600 hover:text-primary-800 font-medium">Generate synthetic data</button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-    <div class="section-body">
-        {% if autotune_jobs %}
+</div>
+
+<!-- No results message -->
+<div id="no-results" class="card hidden">
+    <div class="card-body text-center py-12">
+        <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <p class="text-gray-500 dark:text-gray-400">No features match your filters</p>
+        <button onclick="clearFilters()" class="mt-3 text-primary-600 hover:text-primary-800 font-medium">Clear Filters</button>
+    </div>
+</div>
+
+<!-- AutoTune Jobs (Collapsible) -->
+{% if autotune_jobs %}
+<details class="mt-6">
+    <summary class="cursor-pointer text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+        AutoTune Jobs ({{ autotune_jobs | length }})
+    </summary>
+    <div class="card mt-2">
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
@@ -136,192 +224,187 @@
                 </tbody>
             </table>
         </div>
-        {% else %}
-        <p class="text-gray-500 dark:text-gray-400 text-center py-8">No AutoTune jobs yet. Use the AutoTune feature from the home page.</p>
-        {% endif %}
     </div>
-</div>
+</details>
+{% endif %}
 
-<!-- Meta Features List -->
-<div class="section-card">
-    <div class="section-header">
-        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path></svg>
-        <h3 class="section-title">Meta Features</h3>
-    </div>
-    <div class="section-body">
-        {% if meta_features %}
-        <!-- Filters -->
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
-            <div>
-                <label class="form-label text-xs">Type</label>
-                <select id="filter-type" class="form-select text-sm w-full" onchange="applyMetaFilters()">
-                    <option value="">All</option>
-                    <option value="synthetic">Synthetic</option>
-                    <option value="real">Real</option>
-                </select>
-            </div>
-            <div>
-                <label class="form-label text-xs">Learning Rate</label>
-                <select id="filter-lr" class="form-select text-sm w-full" onchange="applyMetaFilters()">
-                    <option value="">All</option>
-                </select>
-            </div>
-            <div>
-                <label class="form-label text-xs">LoRA r</label>
-                <select id="filter-lora" class="form-select text-sm w-full" onchange="applyMetaFilters()">
-                    <option value="">All</option>
-                </select>
-            </div>
-            <div>
-                <label class="form-label text-xs">Model</label>
-                <select id="filter-model" class="form-select text-sm w-full" onchange="applyMetaFilters()">
-                    <option value="">All</option>
-                </select>
-            </div>
-            <div>
-                <label class="form-label text-xs">Batch Size</label>
-                <select id="filter-batch" class="form-select text-sm w-full" onchange="applyMetaFilters()">
-                    <option value="">All</option>
-                </select>
-            </div>
-        </div>
-        <div class="overflow-x-auto">
-            <table id="meta-features-table" class="w-full text-sm">
-                <thead>
-                    <tr class="bg-gray-50 dark:bg-gray-700">
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" onclick="sortMetaTable(0, 'string')">
-                            <div class="flex items-center gap-1">Experiment ID <span class="sort-icon">↕</span></div>
-                        </th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" onclick="sortMetaTable(1, 'string')">
-                            <div class="flex items-center justify-center gap-1">Type <span class="sort-icon">↕</span></div>
-                        </th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" onclick="sortMetaTable(2, 'number')">
-                            <div class="flex items-center justify-center gap-1">LR <span class="sort-icon">↕</span></div>
-                        </th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" onclick="sortMetaTable(3, 'number')">
-                            <div class="flex items-center justify-center gap-1">LoRA r <span class="sort-icon">↕</span></div>
-                        </th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" onclick="sortMetaTable(4, 'number')">
-                            <div class="flex items-center justify-center gap-1">Final Loss <span class="sort-icon">↕</span></div>
-                        </th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" onclick="sortMetaTable(5, 'number')">
-                            <div class="flex items-center justify-center gap-1">ROUGE-L <span class="sort-icon">↕</span></div>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                    {% for f in meta_features %}
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 meta-row"
-                        data-type="{{ 'synthetic' if f.is_synthetic else 'real' }}"
-                        data-lr="{{ f.learning_rate or '' }}"
-                        data-lora="{{ f.lora_r or '' }}"
-                        data-model="{{ f.model_name or '' }}"
-                        data-batch="{{ f.batch_size or '' }}">
-                        <td class="px-3 py-2 font-mono" data-value="{{ f.experiment_id }}">{{ f.experiment_id[:16] }}...</td>
-                        <td class="px-3 py-2 text-center" data-value="{{ 'synthetic' if f.is_synthetic else 'real' }}">
-                            {% if f.is_synthetic %}
-                            <span class="badge badge-purple">synthetic</span>
-                            {% else %}
-                            <span class="badge badge-blue">real</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-3 py-2 text-center font-mono" data-value="{{ f.learning_rate or 0 }}">{{ "%.0e"|format(f.learning_rate) if f.learning_rate else '-' }}</td>
-                        <td class="px-3 py-2 text-center" data-value="{{ f.lora_r or 0 }}">{{ f.lora_r or '-' }}</td>
-                        <td class="px-3 py-2 text-center font-mono text-amber-600 dark:text-amber-400" data-value="{{ f.final_eval_loss or 999 }}">{{ "%.4f"|format(f.final_eval_loss) if f.final_eval_loss else '-' }}</td>
-                        <td class="px-3 py-2 text-center font-mono text-emerald-600 dark:text-emerald-400" data-value="{{ f.final_rouge_score if f.final_rouge_score and f.final_rouge_score > 0 else (f.final_bleu_score or -1) }}">
-                            {% if f.final_rouge_score and f.final_rouge_score > 0 %}
-                            {{ "%.2f"|format(f.final_rouge_score) }}
-                            {% elif f.final_bleu_score and f.final_bleu_score > 0 %}
-                            <span class="text-blue-500" title="BLEU (no ROUGE available)">{{ "%.2f"|format(f.final_bleu_score) }}*</span>
-                            {% else %}
-                            -
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        <p id="meta-count" class="text-sm text-gray-500 dark:text-gray-400 mt-4 text-center">Showing {{ meta_features | length }} features</p>
-        {% else %}
-        <p class="text-gray-500 dark:text-gray-400 text-center py-8">No meta-features stored yet. Generate synthetic data or extract from experiments.</p>
-        {% endif %}
-    </div>
-</div>
+<!-- Modal Backdrop -->
+<div id="modal-backdrop" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden" onclick="closeAllModals()"></div>
 
-<!-- Training Modal -->
-<div id="train-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden">
-        <!-- Loading State -->
-        <div id="train-loading">
-            <div class="bg-blue-500 px-6 py-4">
-                <h3 class="text-lg font-semibold text-white flex items-center gap-2">
-                    <svg class="w-6 h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                    Training Predictor...
-                </h3>
+<!-- Generate Synthetic Modal -->
+<div id="synthetic-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div class="flex min-h-full items-start justify-center p-4 pt-24">
+        <div class="relative w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Generate Synthetic Data</h2>
+                <button onclick="closeAllModals()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
             </div>
-            <div class="px-6 py-8 text-center">
-                <div class="inline-block w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p class="text-gray-600 dark:text-gray-300">Training GBM model with cross-validation...</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">This may take a few seconds</p>
-            </div>
-        </div>
-        <!-- Results State -->
-        <div id="train-results" class="hidden">
-            <div class="bg-emerald-500 px-6 py-4">
-                <h3 class="text-lg font-semibold text-white flex items-center gap-2">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Predictor Training Complete
-                </h3>
-            </div>
-            <div class="px-6 py-4">
-                <p id="train-message" class="text-gray-600 dark:text-gray-300 mb-4"></p>
-                <div class="grid grid-cols-2 gap-4 text-center">
-                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-                        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">CV RMSE</p>
-                        <p class="text-xl font-bold text-blue-600 dark:text-blue-400"><span id="train-rmse"></span> <span id="train-rmse-std" class="text-sm font-normal text-gray-400"></span></p>
+            <div class="p-6">
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Bootstrap the predictor with synthetic training data based on domain knowledge.</p>
+                <form action="/meta/generate-synthetic" method="post" class="space-y-4">
+                    <div class="form-group">
+                        <label class="form-label">Number of Samples</label>
+                        <input type="number" name="n_samples" value="100" min="10" max="500" class="form-input">
+                        <p class="text-xs text-gray-500 mt-1">10-500 samples recommended</p>
                     </div>
-                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-                        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">Best Iteration</p>
-                        <p id="train-iterations" class="text-xl font-bold text-emerald-600 dark:text-emerald-400"></p>
+                    <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <button type="button" onclick="closeAllModals()" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">Cancel</button>
+                        <button type="submit" class="btn-primary">Generate</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Train Predictor Modal -->
+<div id="train-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div class="flex min-h-full items-start justify-center p-4 pt-24">
+        <div class="relative w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700" onclick="event.stopPropagation()">
+            <!-- Config View -->
+            <div id="train-config">
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Train Predictor</h2>
+                    <button onclick="closeAllModals()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div class="p-6">
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Train GBM predictor on stored meta-features ({{ meta_features_count }} available).</p>
+                    <div class="form-group mb-4">
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" id="include-synthetic" checked class="form-checkbox">
+                            <span class="text-sm text-gray-700 dark:text-gray-300">Include synthetic data</span>
+                        </label>
+                    </div>
+                    <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <button type="button" onclick="closeAllModals()" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">Cancel</button>
+                        <button onclick="startTraining()" class="btn-success">Train Predictor</button>
                     </div>
                 </div>
-                <p id="train-explanation" class="text-xs text-gray-500 dark:text-gray-400 mt-4 text-center"></p>
             </div>
-            <div class="px-6 py-3 bg-gray-50 dark:bg-gray-700 flex justify-end">
-                <button onclick="closeTrainModal()" class="btn-primary">Got it</button>
+            <!-- Loading State -->
+            <div id="train-loading" class="hidden">
+                <div class="bg-blue-500 px-6 py-4 rounded-t-2xl">
+                    <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                        <svg class="w-6 h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        Training Predictor...
+                    </h3>
+                </div>
+                <div class="px-6 py-8 text-center">
+                    <div class="inline-block w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <p class="text-gray-600 dark:text-gray-300">Training GBM model with cross-validation...</p>
+                </div>
+            </div>
+            <!-- Results State -->
+            <div id="train-results" class="hidden">
+                <div class="bg-emerald-500 px-6 py-4 rounded-t-2xl">
+                    <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Training Complete
+                    </h3>
+                </div>
+                <div class="p-6">
+                    <p id="train-message" class="text-gray-600 dark:text-gray-300 mb-4"></p>
+                    <div class="grid grid-cols-2 gap-4 text-center">
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                            <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">CV RMSE</p>
+                            <p class="text-xl font-bold text-blue-600 dark:text-blue-400"><span id="train-rmse"></span> <span id="train-rmse-std" class="text-sm font-normal text-gray-400"></span></p>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                            <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">Best Iteration</p>
+                            <p id="train-iterations" class="text-xl font-bold text-emerald-600 dark:text-emerald-400"></p>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-3 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
+                        <button onclick="closeAllModals(); location.reload();" class="btn-primary">Done</button>
+                    </div>
+                </div>
+            </div>
+            <!-- Error State -->
+            <div id="train-error" class="hidden">
+                <div class="bg-red-500 px-6 py-4 rounded-t-2xl">
+                    <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Training Failed
+                    </h3>
+                </div>
+                <div class="p-6">
+                    <p id="train-error-message" class="text-gray-600 dark:text-gray-300"></p>
+                    <div class="flex justify-end gap-3 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
+                        <button onclick="closeAllModals()" class="btn-primary">Close</button>
+                    </div>
+                </div>
             </div>
         </div>
-        <!-- Error State -->
-        <div id="train-error" class="hidden">
-            <div class="bg-red-500 px-6 py-4">
-                <h3 class="text-lg font-semibold text-white flex items-center gap-2">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Training Failed
-                </h3>
+    </div>
+</div>
+
+<!-- More Actions Modal -->
+<div id="actions-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div class="flex min-h-full items-start justify-center p-4 pt-24">
+        <div class="relative w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">More Actions</h2>
+                <button onclick="closeAllModals()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
             </div>
-            <div class="px-6 py-4">
-                <p id="train-error-message" class="text-gray-600 dark:text-gray-300"></p>
-            </div>
-            <div class="px-6 py-3 bg-gray-50 dark:bg-gray-700 flex justify-end">
-                <button onclick="closeTrainModal()" class="btn-primary">Close</button>
+            <div class="p-6 space-y-4">
+                <!-- Clear Synthetic -->
+                <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div class="flex items-center gap-3 mb-2">
+                        <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        <h3 class="font-medium text-gray-900 dark:text-gray-100">Clear Synthetic Data</h3>
+                    </div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">Remove all synthetic features. Keep only real experiment data.</p>
+                    <form action="/meta/clear-synthetic" method="post" onsubmit="return confirm('Remove all synthetic features?')">
+                        <button type="submit" class="btn-danger text-sm">Clear Synthetic</button>
+                    </form>
+                </div>
+                <!-- Backfill ROUGE -->
+                <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div class="flex items-center gap-3 mb-2">
+                        <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        <h3 class="font-medium text-gray-900 dark:text-gray-100">Backfill ROUGE-L</h3>
+                    </div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">Populate missing ROUGE-L scores from existing benchmark evaluations.</p>
+                    <form action="/meta/backfill-rouge" method="post">
+                        <button type="submit" class="btn-primary text-sm">Backfill Scores</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
+// Modal functions
+function openModal(id) {
+    document.getElementById('modal-backdrop').classList.remove('hidden');
+    document.getElementById(id).classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeAllModals() {
+    document.getElementById('modal-backdrop').classList.add('hidden');
+    document.querySelectorAll('[id$="-modal"]').forEach(m => m.classList.add('hidden'));
+    document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAllModals(); });
+
+// Training
 function startTraining() {
-    const modal = document.getElementById('train-modal');
+    const config = document.getElementById('train-config');
     const loading = document.getElementById('train-loading');
     const results = document.getElementById('train-results');
     const error = document.getElementById('train-error');
     
-    // Show modal with loading state
-    modal.classList.remove('hidden');
+    config.classList.add('hidden');
     loading.classList.remove('hidden');
-    results.classList.add('hidden');
-    error.classList.add('hidden');
     
     const includeSynthetic = document.getElementById('include-synthetic').checked;
     
@@ -339,14 +422,10 @@ function startTraining() {
         results.classList.remove('hidden');
         
         const metrics = data.metrics || {};
-        const rmse = metrics.train_rmse?.toFixed(2) || '0';
-        const rmseStd = metrics.train_rmse_std?.toFixed(2) || '0';
-        
         document.getElementById('train-message').textContent = data.message || '';
-        document.getElementById('train-rmse').textContent = rmse;
-        document.getElementById('train-rmse-std').textContent = `± ${rmseStd}`;
+        document.getElementById('train-rmse').textContent = (metrics.train_rmse || 0).toFixed(2);
+        document.getElementById('train-rmse-std').textContent = `± ${(metrics.train_rmse_std || 0).toFixed(2)}`;
         document.getElementById('train-iterations').textContent = Math.round(metrics.best_iteration || 0);
-        document.getElementById('train-explanation').textContent = `RMSE ~${rmse} means predictions are typically within ±${rmse} points of actual scores.`;
     })
     .catch(err => {
         loading.classList.add('hidden');
@@ -355,25 +434,7 @@ function startTraining() {
     });
 }
 
-function closeTrainModal() {
-    document.getElementById('train-modal').classList.add('hidden');
-    // Reload to update predictor status
-    window.location.reload();
-}
-
-// Close on escape key
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeTrainModal();
-});
-
-// Close on backdrop click
-document.getElementById('train-modal').addEventListener('click', function(e) {
-    if (e.target === this) closeTrainModal();
-});
-</script>
-
-<script>
-// Populate filter dropdowns from table data
+// Populate filter dropdowns
 document.addEventListener('DOMContentLoaded', function() {
     const rows = document.querySelectorAll('.meta-row');
     const lrValues = new Set();
@@ -392,6 +453,8 @@ document.addEventListener('DOMContentLoaded', function() {
     populateSelect('filter-lora', Array.from(loraValues).sort((a, b) => parseInt(a) - parseInt(b)));
     populateSelect('filter-model', Array.from(modelValues).sort(), v => v.split('/').pop());
     populateSelect('filter-batch', Array.from(batchValues).sort((a, b) => parseInt(a) - parseInt(b)));
+    
+    applyFilters();
 });
 
 function populateSelect(id, values, labelFn) {
@@ -405,15 +468,18 @@ function populateSelect(id, values, labelFn) {
     });
 }
 
-function applyMetaFilters() {
+// Filtering
+function applyFilters() {
     const typeFilter = document.getElementById('filter-type').value;
     const lrFilter = document.getElementById('filter-lr').value;
     const loraFilter = document.getElementById('filter-lora').value;
     const modelFilter = document.getElementById('filter-model').value;
     const batchFilter = document.getElementById('filter-batch').value;
+    const rougeMin = parseFloat(document.getElementById('filter-rouge-min').value) || 0;
     
     const rows = document.querySelectorAll('.meta-row');
     let visibleCount = 0;
+    const totalCount = rows.length;
     
     rows.forEach(row => {
         let match = true;
@@ -422,27 +488,53 @@ function applyMetaFilters() {
         if (loraFilter && row.dataset.lora !== loraFilter) match = false;
         if (modelFilter && row.dataset.model !== modelFilter) match = false;
         if (batchFilter && row.dataset.batch !== batchFilter) match = false;
+        if (rougeMin > 0 && parseFloat(row.dataset.rouge || 0) < rougeMin) match = false;
         
         row.style.display = match ? '' : 'none';
         if (match) visibleCount++;
     });
     
-    document.getElementById('meta-count').textContent = `Showing ${visibleCount} of {{ meta_features | length }} features`;
+    document.getElementById('filter-count').textContent = visibleCount === totalCount 
+        ? `Showing all ${totalCount} features` 
+        : `Showing ${visibleCount} of ${totalCount} features`;
+    
+    const noResults = document.getElementById('no-results');
+    const table = document.querySelector('.card:has(#meta-table)');
+    if (totalCount > 0 && visibleCount === 0) {
+        noResults.classList.remove('hidden');
+        table.classList.add('hidden');
+    } else {
+        noResults.classList.add('hidden');
+        table.classList.remove('hidden');
+    }
 }
 
-let metaSortColumn = -1;
-let metaSortAsc = true;
+function clearFilters() {
+    document.getElementById('filter-type').value = '';
+    document.getElementById('filter-lr').value = '';
+    document.getElementById('filter-lora').value = '';
+    document.getElementById('filter-model').value = '';
+    document.getElementById('filter-batch').value = '';
+    document.getElementById('filter-rouge-min').value = '';
+    applyFilters();
+}
 
-function sortMetaTable(colIndex, type) {
-    const table = document.getElementById('meta-features-table');
-    const tbody = table.querySelector('tbody');
-    const rows = Array.from(tbody.querySelectorAll('tr'));
+// Sorting
+let sortColumn = -1;
+let sortAsc = true;
+
+function sortTable(colIndex, type) {
+    const table = document.getElementById('meta-table');
+    const tbody = document.getElementById('meta-tbody');
+    const rows = Array.from(tbody.querySelectorAll('.meta-row'));
     
-    if (metaSortColumn === colIndex) {
-        metaSortAsc = !metaSortAsc;
+    if (rows.length === 0) return;
+    
+    if (sortColumn === colIndex) {
+        sortAsc = !sortAsc;
     } else {
-        metaSortColumn = colIndex;
-        metaSortAsc = true;
+        sortColumn = colIndex;
+        sortAsc = true;
     }
     
     rows.sort((a, b) => {
@@ -454,9 +546,9 @@ function sortMetaTable(colIndex, type) {
         if (type === 'number') {
             aVal = parseFloat(aVal) || 0;
             bVal = parseFloat(bVal) || 0;
-            return metaSortAsc ? aVal - bVal : bVal - aVal;
+            return sortAsc ? aVal - bVal : bVal - aVal;
         } else {
-            return metaSortAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+            return sortAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
         }
     });
     
@@ -467,14 +559,9 @@ function sortMetaTable(colIndex, type) {
     headers.forEach((th, i) => {
         const icon = th.querySelector('.sort-icon');
         if (icon) {
-            if (i === colIndex) {
-                icon.textContent = metaSortAsc ? '↑' : '↓';
-            } else {
-                icon.textContent = '↕';
-            }
+            icon.textContent = i === colIndex ? (sortAsc ? '↑' : '↓') : '↕';
         }
     });
 }
 </script>
 {% endblock %}
-
