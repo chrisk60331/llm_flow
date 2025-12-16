@@ -383,13 +383,6 @@
         }
 
         // Update sort icons
-        document.querySelectorAll('.sort-icon').forEach(icon => {
-            icon.classList.remove('text-blue-500', 'dark:text-blue-400');
-        });
-        const activeIcon = document.querySelector(`.sort-icon[data-col="${columnIndex}"]`);
-        if (activeIcon) {
-            activeIcon.classList.add('text-blue-500', 'dark:text-blue-400');
-        }
         
         rows.sort((a, b) => {
             let aVal, bVal;
