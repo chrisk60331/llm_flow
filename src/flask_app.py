@@ -1019,7 +1019,9 @@ def api_stop_experiment(experiment_id: str):
 
 @app.route("/api/evaluations/<eval_id>")
 def api_evaluation_detail(eval_id: str):
-    resp = requests.get(f"{API_BASE_URL}/evaluations/{eval_id}", timeout=10)
+    # Evaluation payloads can be large and the API process may be busy loading
+    # models; 10s is too aggressive and causes spurious UI 500s.
+    resp = requests.get(f"{API_BASE_URL}/evaluations/{eval_id}", timeout=60)
     return jsonify(resp.json())
 
 

@@ -16,14 +16,21 @@ logger = logging.getLogger(__name__)
 def _preferred_device() -> torch.device:
     if torch.cuda.is_available():
         return torch.device("cuda")
-    if torch.backends.mps.is_available():
-        return torch.device("mps")
+    # NOTE: MPS can trigger hard crashes / malloc heap corruption in long-running
+    # processes for some model + ops combinations. For benchmark evaluation we
+    # prefer stability over speed, so we run on CPU unless CUDA is available.
     return torch.device("cpu")
 
 
 def load_model_and_tokenizer(model_path: Path) -> tuple:
     """Load a PEFT model and tokenizer from checkpoint."""
-    model = AutoPeftModelForCausalLM.from_pretrained(model_path)
+    # Explicitly disable low-mem loading to avoid meta-tensor initialization
+    # that cannot be moved via Module.to(...).
+    model = AutoPeftModelForCausalLM.from_pretrained(
+        model_path,
+        low_cpu_mem_usage=False,
+        device_map=None,
+    )
     device = _preferred_device()
     model.to(device)
     tokenizer = AutoTokenizer.from_pretrained(model_path)
