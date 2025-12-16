@@ -122,7 +122,7 @@ def list_configs_with_metrics() -> list[ConfigWithMetrics]:
             
             bleu_stats = conn.execute(
                 """
-                SELECT AVG(be.bleu_score) as avg_bleu
+                SELECT AVG(be.bleu_score) as avg_bleu, MAX(be.primary_score) as best_primary_score
                 FROM benchmark_evals be
                 JOIN experiments e ON be.experiment_id = e.id
                 WHERE e.config_id = ? AND be.status = 'completed'
@@ -140,6 +140,7 @@ def list_configs_with_metrics() -> list[ConfigWithMetrics]:
                     experiment_count=exp_stats["count"] or 0,
                     min_eval_loss=exp_stats["min_loss"],
                     avg_bleu=bleu_stats["avg_bleu"] if bleu_stats else None,
+                    primary_score=bleu_stats["best_primary_score"] if bleu_stats else None,
                 )
             )
         return results

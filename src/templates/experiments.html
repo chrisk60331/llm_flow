@@ -25,45 +25,53 @@
 </div>
 
 <!-- Filters -->
-<div class="mb-4 grid grid-cols-2 md:grid-cols-6 gap-3">
-    <div>
-        <label class="form-label text-xs">Search</label>
-        <input type="text" id="exp-search" placeholder="ID or config..." class="form-input" onkeyup="filterExperiments()">
-    </div>
-    <div>
-        <label class="form-label text-xs">Type</label>
-        <select id="filter-type" class="form-select w-full" onchange="filterExperiments()">
-            <option value="">All</option>
-            <option value="causal_lm">Causal LM</option>
-            <option value="masked_lm">Masked LM</option>
-            <option value="custom_lightning">Custom Lightning</option>
-        </select>
-    </div>
-    <div>
-        <label class="form-label text-xs">Config</label>
-        <select id="filter-config" class="form-select w-full" onchange="filterExperiments()">
-            <option value="">All</option>
-        </select>
-    </div>
-    <div>
-        <label class="form-label text-xs">Dataset</label>
-        <select id="filter-dataset" class="form-select w-full" onchange="filterExperiments()">
-            <option value="">All</option>
-        </select>
-    </div>
-    <div>
-        <label class="form-label text-xs">Status</label>
-        <select id="filter-status" class="form-select w-full" onchange="filterExperiments()">
-            <option value="">All</option>
-        </select>
-    </div>
-    <div>
-        <label class="form-label text-xs">Has Loss</label>
-        <select id="filter-loss" class="form-select w-full" onchange="filterExperiments()">
-            <option value="">All</option>
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-        </select>
+<div class="card mb-4">
+    <div class="card-body py-3">
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Search</label>
+                <input type="text" id="exp-search" placeholder="ID or config..." class="form-input text-sm py-1.5" onkeyup="filterExperiments()">
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Type</label>
+                <select id="filter-type" class="form-select text-sm py-1.5" onchange="filterExperiments()">
+                    <option value="">All</option>
+                    <option value="causal_lm">Causal LM</option>
+                    <option value="masked_lm">Masked LM</option>
+                    <option value="custom_lightning">Custom Lightning</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Config</label>
+                <select id="filter-config" class="form-select text-sm py-1.5" onchange="filterExperiments()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Dataset</label>
+                <select id="filter-dataset" class="form-select text-sm py-1.5" onchange="filterExperiments()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Status</label>
+                <select id="filter-status" class="form-select text-sm py-1.5" onchange="filterExperiments()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Has Loss</label>
+                <select id="filter-loss" class="form-select text-sm py-1.5" onchange="filterExperiments()">
+                    <option value="">All</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                </select>
+            </div>
+        </div>
+        <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+            <span id="exp-count" class="text-sm text-gray-500 dark:text-gray-400">Showing {{ experiments | length }} experiments</span>
+            <button onclick="clearFilters()" class="text-sm text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 font-medium">Clear Filters</button>
+        </div>
     </div>
 </div>
 
@@ -180,7 +188,14 @@
     </div>
 </div>
 
-<p id="exp-count" class="text-sm text-gray-500 dark:text-gray-400 mt-4 text-center">Showing {{ experiments | length }} experiments</p>
+<!-- No results message -->
+<div id="no-results" class="card hidden">
+    <div class="card-body text-center py-12">
+        <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <p class="text-gray-500 dark:text-gray-400">No experiments match your filters</p>
+        <button onclick="clearFilters()" class="mt-3 text-primary-600 hover:text-primary-800 font-medium">Clear Filters</button>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -223,6 +238,7 @@ function filterExperiments() {
     const lossFilter = document.getElementById('filter-loss').value;
     const rows = document.querySelectorAll('.exp-row');
     let visibleCount = 0;
+    const totalCount = rows.length;
     
     rows.forEach(row => {
         let match = true;
@@ -253,7 +269,30 @@ function filterExperiments() {
         if (match) visibleCount++;
     });
     
-    document.getElementById('exp-count').textContent = `Showing ${visibleCount} of {{ experiments | length }} experiments`;
+    document.getElementById('exp-count').textContent = visibleCount === totalCount 
+        ? `Showing all ${totalCount} experiments` 
+        : `Showing ${visibleCount} of ${totalCount} experiments`;
+
+    // Show/hide no results
+    const noResults = document.getElementById('no-results');
+    const table = document.querySelector('.card:has(#experiments-table)');
+    if (totalCount > 0 && visibleCount === 0) {
+        noResults.classList.remove('hidden');
+        table.classList.add('hidden');
+    } else {
+        noResults.classList.add('hidden');
+        table.classList.remove('hidden');
+    }
+}
+
+function clearFilters() {
+    document.getElementById('exp-search').value = '';
+    document.getElementById('filter-type').value = '';
+    document.getElementById('filter-config').value = '';
+    document.getElementById('filter-dataset').value = '';
+    document.getElementById('filter-status').value = '';
+    document.getElementById('filter-loss').value = '';
+    filterExperiments();
 }
 
 let sortColumn = -1;
@@ -307,4 +346,3 @@ function sortTable(colIndex, type) {
 }
 </script>
 {% endblock %}
-

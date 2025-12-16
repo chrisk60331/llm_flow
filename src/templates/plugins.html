@@ -3,78 +3,342 @@
 {% block title %}Plugins - EvalLedger{% endblock %}
 
 {% block content %}
-<div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Plugins</h1>
-    <p class="text-gray-600 dark:text-gray-400">Upload untrusted Python plugins (discovered via AST; executed only in a subprocess)</p>
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Plugins</h1>
+        <p class="text-gray-600 dark:text-gray-400">Upload untrusted Python plugins (discovered via AST; executed only in a subprocess)</p>
+    </div>
+    <button onclick="openModal()" class="btn-primary flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+        Upload Plugin
+    </button>
 </div>
 
-<div class="card mb-6">
-    <div class="card-header">
-        <h2 class="font-semibold text-gray-800 dark:text-gray-200">Upload Plugin</h2>
-    </div>
-    <div class="card-body">
-        <form action="/plugins/upload" method="post" enctype="multipart/form-data" class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="form-group">
-                    <label class="form-label">Kind</label>
-                    <select name="kind" class="form-select" required>
-                        <option value="lightning_module">lightning_module</option>
-                        <option value="dataloaders">dataloaders</option>
-                        <option value="benchmark">benchmark</option>
-                    </select>
-                </div>
-                <div class="form-group md:col-span-2">
-                    <label class="form-label">Python file (.py)</label>
-                    <input type="file" name="file" accept=".py" required
-                        class="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 file:cursor-pointer cursor-pointer">
-                </div>
+<!-- Modal Backdrop -->
+<div id="modal-backdrop" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden" onclick="closeModal()"></div>
+
+<!-- Upload Plugin Modal -->
+<div id="upload-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div class="flex min-h-full items-start justify-center p-4 pt-24">
+        <div class="relative w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700" onclick="event.stopPropagation()">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Upload Plugin</h2>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
             </div>
-            <button type="submit" class="btn-primary">Upload</button>
-        </form>
+            <!-- Modal Body -->
+            <div class="p-6">
+                <form action="/plugins/upload" method="post" enctype="multipart/form-data" class="space-y-4">
+                    <div class="form-group">
+                        <label class="form-label">Kind</label>
+                        <select name="kind" class="form-select" required>
+                            <option value="lightning_module">lightning_module</option>
+                            <option value="dataloaders">dataloaders</option>
+                            <option value="benchmark">benchmark</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Select the type of plugin you're uploading</p>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Python File (.py)</label>
+                        <input type="file" name="file" accept=".py" required
+                            class="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 file:cursor-pointer cursor-pointer">
+                    </div>
+                    <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Cancel</button>
+                        <button type="submit" class="btn-primary">Upload</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body py-3">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Name</label>
+                <select id="filter-name" class="form-select text-sm py-1.5" onchange="applyFilters()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Kind</label>
+                <select id="filter-kind" class="form-select text-sm py-1.5" onchange="applyFilters()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Filename</label>
+                <select id="filter-filename" class="form-select text-sm py-1.5" onchange="applyFilters()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Symbols</label>
+                <select id="filter-symbols" class="form-select text-sm py-1.5" onchange="applyFilters()">
+                    <option value="">All</option>
+                </select>
+            </div>
+        </div>
+        <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+            <span id="filter-count" class="text-sm text-gray-500 dark:text-gray-400"></span>
+            <button onclick="clearFilters()" class="text-sm text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 font-medium">Clear Filters</button>
+        </div>
     </div>
 </div>
 
 <div class="card">
-    <div class="card-header">
-        <h2 class="font-semibold text-gray-800 dark:text-gray-200">Uploaded Plugins</h2>
-    </div>
-    <div class="card-body">
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead>
-                    <tr class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Name</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Kind</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">File</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Symbols</th>
-                        <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100">
-                    {% for p in plugins %}
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors">
-                        <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ p.name }}</td>
-                        <td class="px-4 py-3"><span class="badge badge-gray">{{ p.kind }}</span></td>
-                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ p.filename }}</td>
-                        <td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 font-mono whitespace-pre">{{ p.symbols | tojson }}</td>
-                        <td class="px-4 py-3 text-right">
-                            <form action="/plugins/{{ p.id }}/delete" method="post" class="inline">
-                                <button type="submit" class="text-sm font-medium text-red-500 hover:text-red-700">Delete</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="5" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                            No plugins uploaded yet
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    <div class="overflow-x-auto">
+        <table class="w-full" id="plugins-table">
+            <thead>
+                <tr class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="sortTable(0, 'string')">
+                        <div class="flex items-center gap-1">
+                            Name
+                            <svg class="w-4 h-4 sort-icon" data-col="0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+                        </div>
+                    </th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="sortTable(1, 'string')">
+                        <div class="flex items-center gap-1">
+                            Kind
+                            <svg class="w-4 h-4 sort-icon" data-col="1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+                        </div>
+                    </th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="sortTable(2, 'string')">
+                        <div class="flex items-center gap-1">
+                            File
+                            <svg class="w-4 h-4 sort-icon" data-col="2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+                        </div>
+                    </th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Symbols</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-700" id="plugins-tbody">
+                {% for p in plugins %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors plugin-row"
+                    data-name="{{ p.name }}"
+                    data-kind="{{ p.kind }}"
+                    data-filename="{{ p.filename }}"
+                    data-symbols="{{ p.symbols | tojson }}">
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ p.name }}</td>
+                    <td class="px-4 py-3">
+                        {% if p.kind == 'lightning_module' %}
+                        <span class="badge badge-purple">{{ p.kind }}</span>
+                        {% elif p.kind == 'dataloaders' %}
+                        <span class="badge badge-blue">{{ p.kind }}</span>
+                        {% else %}
+                        <span class="badge badge-green">{{ p.kind }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ p.filename }}</td>
+                    <td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 font-mono max-w-xs truncate" title="{{ p.symbols | tojson }}">{{ p.symbols | tojson | truncate(60) }}</td>
+                    <td class="px-4 py-3 text-right">
+                        <form action="/plugins/{{ p.id }}/delete" method="post" class="inline" onsubmit="return confirm('Delete this plugin?')">
+                            <button type="submit" class="text-sm font-medium text-red-500 hover:text-red-700">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr id="empty-row">
+                    <td colspan="5" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        <div class="flex flex-col items-center">
+                            <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            <p>No plugins uploaded yet</p>
+                            <button onclick="openModal()" class="mt-3 text-primary-600 hover:text-primary-800 font-medium">Upload your first plugin</button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
+
+<!-- No results message -->
+<div id="no-results" class="card hidden">
+    <div class="card-body text-center py-12">
+        <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <p class="text-gray-500 dark:text-gray-400">No plugins match your filters</p>
+        <button onclick="clearFilters()" class="mt-3 text-primary-600 hover:text-primary-800 font-medium">Clear Filters</button>
+    </div>
+</div>
+
+<script>
+  // Modal Functions
+  function openModal() {
+    document.getElementById('modal-backdrop').classList.remove('hidden');
+    document.getElementById('upload-modal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    document.getElementById('modal-backdrop').classList.add('hidden');
+    document.getElementById('upload-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeModal();
+  });
+
+  // Sorting
+  let currentSortCol = null;
+  let currentSortDir = 'asc';
+
+  function sortTable(colIndex, type) {
+    const tbody = document.getElementById('plugins-tbody');
+    const rows = Array.from(tbody.querySelectorAll('.plugin-row'));
+    
+    if (rows.length === 0) return;
+
+    if (currentSortCol === colIndex) {
+      currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      currentSortCol = colIndex;
+      currentSortDir = 'asc';
+    }
+
+    document.querySelectorAll('.sort-icon').forEach(icon => {
+      icon.classList.remove('text-primary-600', 'dark:text-primary-400');
+      icon.classList.add('text-gray-400');
+    });
+    const activeIcon = document.querySelector(`.sort-icon[data-col="${colIndex}"]`);
+    if (activeIcon) {
+      activeIcon.classList.remove('text-gray-400');
+      activeIcon.classList.add('text-primary-600', 'dark:text-primary-400');
+    }
+
+    rows.sort((a, b) => {
+      let aVal = a.cells[colIndex].textContent.trim().toLowerCase();
+      let bVal = b.cells[colIndex].textContent.trim().toLowerCase();
+
+      if (aVal < bVal) return currentSortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return currentSortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+  }
+
+  // Populate filter dropdowns from table data
+  function populateFilterDropdowns() {
+    const rows = document.querySelectorAll('.plugin-row');
+    const names = new Set();
+    const kinds = new Set();
+    const filenames = new Set();
+    const symbols = new Set();
+    
+    rows.forEach(row => {
+      if (row.dataset.name) names.add(row.dataset.name);
+      if (row.dataset.kind) kinds.add(row.dataset.kind);
+      if (row.dataset.filename) filenames.add(row.dataset.filename);
+      if (row.dataset.symbols) {
+        try {
+          const syms = JSON.parse(row.dataset.symbols);
+          if (Array.isArray(syms)) syms.forEach(s => symbols.add(s));
+        } catch(e) {}
+      }
+    });
+    
+    const nameSelect = document.getElementById('filter-name');
+    Array.from(names).sort().forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n;
+      opt.textContent = n;
+      nameSelect.appendChild(opt);
+    });
+    
+    const kindSelect = document.getElementById('filter-kind');
+    Array.from(kinds).sort().forEach(k => {
+      const opt = document.createElement('option');
+      opt.value = k;
+      opt.textContent = k;
+      kindSelect.appendChild(opt);
+    });
+    
+    const filenameSelect = document.getElementById('filter-filename');
+    Array.from(filenames).sort().forEach(fn => {
+      const opt = document.createElement('option');
+      opt.value = fn;
+      opt.textContent = fn;
+      filenameSelect.appendChild(opt);
+    });
+    
+    const symbolsSelect = document.getElementById('filter-symbols');
+    Array.from(symbols).sort().forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s;
+      opt.textContent = s;
+      symbolsSelect.appendChild(opt);
+    });
+  }
+
+  // Filtering
+  function applyFilters() {
+    const nameFilter = document.getElementById('filter-name').value;
+    const kindFilter = document.getElementById('filter-kind').value;
+    const filenameFilter = document.getElementById('filter-filename').value;
+    const symbolsFilter = document.getElementById('filter-symbols').value;
+
+    const rows = document.querySelectorAll('.plugin-row');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+      const name = row.dataset.name;
+      const kind = row.dataset.kind;
+      const filename = row.dataset.filename;
+      const symbols = row.dataset.symbols;
+
+      let show = true;
+
+      if (nameFilter && name !== nameFilter) show = false;
+      if (kindFilter && kind !== kindFilter) show = false;
+      if (filenameFilter && filename !== filenameFilter) show = false;
+      if (symbolsFilter && !symbols.includes(symbolsFilter)) show = false;
+
+      row.style.display = show ? '' : 'none';
+      if (show) visibleCount++;
+    });
+
+    const totalCount = rows.length;
+    const countEl = document.getElementById('filter-count');
+    if (totalCount > 0) {
+      countEl.textContent = visibleCount === totalCount 
+        ? `Showing all ${totalCount} plugins` 
+        : `Showing ${visibleCount} of ${totalCount} plugins`;
+    }
+
+    const noResults = document.getElementById('no-results');
+    const table = document.querySelector('.card:has(#plugins-table)');
+    if (totalCount > 0 && visibleCount === 0) {
+      noResults.classList.remove('hidden');
+      table.classList.add('hidden');
+    } else {
+      noResults.classList.add('hidden');
+      table.classList.remove('hidden');
+    }
+  }
+
+  function clearFilters() {
+    document.getElementById('filter-name').value = '';
+    document.getElementById('filter-kind').value = '';
+    document.getElementById('filter-filename').value = '';
+    document.getElementById('filter-symbols').value = '';
+    applyFilters();
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    populateFilterDropdowns();
+    applyFilters();
+  });
+</script>
 {% endblock %}
-
-

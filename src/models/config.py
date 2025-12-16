@@ -178,6 +178,7 @@ class ConfigWithMetrics(BaseModel):
     experiment_count: int = 0
     min_eval_loss: float | None = None
     avg_bleu: float | None = None
+    primary_score: float | None = None
 
 
 class ConfigListResponse(BaseModel):

@@ -20,41 +20,49 @@
 </div>
 
 <!-- Filters -->
-<div class="mb-4 grid grid-cols-2 md:grid-cols-5 gap-3">
-    <div>
-        <label class="form-label text-xs">Search</label>
-        <input type="text" id="config-search" placeholder="Name or model..." class="form-input" onkeyup="filterConfigs()">
-    </div>
-    <div>
-        <label class="form-label text-xs">Type</label>
-        <select id="filter-type" class="form-select w-full" onchange="filterConfigs()">
-            <option value="">All</option>
-            <option value="causal_lm">Causal LM</option>
-            <option value="masked_lm">Masked LM</option>
-            <option value="custom_lightning">Custom Lightning</option>
-        </select>
-    </div>
-    <div>
-        <label class="form-label text-xs">Model</label>
-        <select id="filter-model" class="form-select w-full" onchange="filterConfigs()">
-            <option value="">All</option>
-        </select>
-    </div>
-    <div>
-        <label class="form-label text-xs">Has Experiments</label>
-        <select id="filter-experiments" class="form-select w-full" onchange="filterConfigs()">
-            <option value="">All</option>
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-        </select>
-    </div>
-    <div>
-        <label class="form-label text-xs">Has Results</label>
-        <select id="filter-results" class="form-select w-full" onchange="filterConfigs()">
-            <option value="">All</option>
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-        </select>
+<div class="card mb-4">
+    <div class="card-body py-3">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Search</label>
+                <input type="text" id="config-search" placeholder="Name or model..." class="form-input text-sm py-1.5" onkeyup="filterConfigs()">
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Type</label>
+                <select id="filter-type" class="form-select text-sm py-1.5" onchange="filterConfigs()">
+                    <option value="">All</option>
+                    <option value="causal_lm">Causal LM</option>
+                    <option value="masked_lm">Masked LM</option>
+                    <option value="custom_lightning">Custom Lightning</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Model</label>
+                <select id="filter-model" class="form-select text-sm py-1.5" onchange="filterConfigs()">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Has Experiments</label>
+                <select id="filter-experiments" class="form-select text-sm py-1.5" onchange="filterConfigs()">
+                    <option value="">All</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Has Results</label>
+                <select id="filter-results" class="form-select text-sm py-1.5" onchange="filterConfigs()">
+                    <option value="">All</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                </select>
+            </div>
+        </div>
+        <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+            <span id="config-count" class="text-sm text-gray-500 dark:text-gray-400">Showing {{ configs | length }} configs</span>
+            <button onclick="clearFilters()" class="text-sm text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 font-medium">Clear Filters</button>
+        </div>
     </div>
 </div>
 
@@ -82,7 +90,7 @@
                         <div class="flex items-center justify-center gap-1">Min Eval Loss <span class="sort-icon">↕</span></div>
                     </th>
                     <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(6, 'number')">
-                        <div class="flex items-center justify-center gap-1">Avg ROUGE <span class="sort-icon">↕</span></div>
+                        <div class="flex items-center justify-center gap-1">Primary Score <span class="sort-icon">↕</span></div>
                     </th>
                     <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -96,7 +104,7 @@
                     data-model="{{ model_name }}"
                     data-experiments="{{ config.experiment_count }}"
                     data-has-experiments="{{ 'yes' if config.experiment_count > 0 else 'no' }}"
-                    data-has-results="{{ 'yes' if config.avg_bleu is not none else 'no' }}">
+                    data-has-results="{{ 'yes' if config.primary_score is not none else 'no' }}">
                     <td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-100" data-value="{{ config.name }}">
                         <a href="/configs/{{ config.id }}" class="hover:text-primary-600">{{ config.name }}</a>
                     </td>
@@ -127,9 +135,9 @@
                         <span class="text-gray-400">-</span>
                         {% endif %}
                     </td>
-                    <td class="px-4 py-3 text-center text-sm" data-value="{{ config.avg_bleu if config.avg_bleu is not none else -1 }}">
-                        {% if config.avg_bleu is not none %}
-                        <span class="font-mono text-emerald-600 dark:text-emerald-400">{{ "%.2f"|format(config.avg_bleu) }}</span>
+                    <td class="px-4 py-3 text-center text-sm" data-value="{{ config.primary_score if config.primary_score is not none else -1 }}">
+                        {% if config.primary_score is not none %}
+                        <span class="font-mono text-emerald-600 dark:text-emerald-400">{{ "%.4f"|format(config.primary_score) }}</span>
                         {% else %}
                         <span class="text-gray-400">-</span>
                         {% endif %}
@@ -151,6 +159,15 @@
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+</div>
+
+<!-- No results message -->
+<div id="no-results" class="card hidden">
+    <div class="card-body text-center py-12">
+        <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <p class="text-gray-500 dark:text-gray-400">No configs match your filters</p>
+        <button onclick="clearFilters()" class="mt-3 text-primary-600 hover:text-primary-800 font-medium">Clear Filters</button>
     </div>
 </div>
 {% endblock %}
@@ -183,6 +200,7 @@ function filterConfigs() {
     const resultsFilter = document.getElementById('filter-results').value;
     const rows = document.querySelectorAll('.config-row');
     let visibleCount = 0;
+    const totalCount = rows.length;
     
     rows.forEach(row => {
         const name = row.dataset.name.toLowerCase();
@@ -209,6 +227,30 @@ function filterConfigs() {
         row.style.display = match ? '' : 'none';
         if (match) visibleCount++;
     });
+
+    document.getElementById('config-count').textContent = visibleCount === totalCount 
+        ? `Showing all ${totalCount} configs` 
+        : `Showing ${visibleCount} of ${totalCount} configs`;
+
+    // Show/hide no results
+    const noResults = document.getElementById('no-results');
+    const table = document.querySelector('.card:has(#configs-table)');
+    if (totalCount > 0 && visibleCount === 0) {
+        noResults.classList.remove('hidden');
+        table.classList.add('hidden');
+    } else {
+        noResults.classList.add('hidden');
+        table.classList.remove('hidden');
+    }
+}
+
+function clearFilters() {
+    document.getElementById('config-search').value = '';
+    document.getElementById('filter-type').value = '';
+    document.getElementById('filter-model').value = '';
+    document.getElementById('filter-experiments').value = '';
+    document.getElementById('filter-results').value = '';
+    filterConfigs();
 }
 
 let sortColumn = -1;
@@ -262,4 +304,3 @@ function sortTable(colIndex, type) {
 }
 </script>
 {% endblock %}
-

@@ -194,25 +194,27 @@
         <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
             <div>
                 <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Name</label>
-                <input type="text" id="filter-name" placeholder="Filter..." class="form-input text-sm py-1.5" oninput="applyFilters()">
+                <select id="filter-name" class="form-select text-sm py-1.5" onchange="applyFilters()">
+                    <option value="">All</option>
+                </select>
             </div>
             <div>
                 <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Type</label>
                 <select id="filter-type" class="form-select text-sm py-1.5" onchange="applyFilters()">
                     <option value="">All</option>
-                    <option value="causal_lm_qa">causal_lm_qa</option>
-                    <option value="masked_lm_fill_mask">masked_lm_fill_mask</option>
-                    <option value="custom_lightning_sin_regression">custom_lightning_sin</option>
-                    <option value="custom_lightning_plugin">custom_lightning_plugin</option>
                 </select>
             </div>
             <div>
                 <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Question</label>
-                <input type="text" id="filter-question" placeholder="Filter..." class="form-input text-sm py-1.5" oninput="applyFilters()">
+                <select id="filter-question" class="form-select text-sm py-1.5" onchange="applyFilters()">
+                    <option value="">All</option>
+                </select>
             </div>
             <div>
                 <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Gold Answer</label>
-                <input type="text" id="filter-gold" placeholder="Filter..." class="form-input text-sm py-1.5" oninput="applyFilters()">
+                <select id="filter-gold" class="form-select text-sm py-1.5" onchange="applyFilters()">
+                    <option value="">All</option>
+                </select>
             </div>
             <div>
                 <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Date From</label>
@@ -272,10 +274,10 @@
             <tbody class="divide-y divide-gray-100 dark:divide-gray-700" id="benchmarks-tbody">
                 {% for bm in benchmarks %}
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors benchmark-row"
-                    data-name="{{ bm.name | lower }}"
+                    data-name="{{ bm.name }}"
                     data-type="{{ bm.benchmark_type }}"
-                    data-question="{{ (bm.question or '') | lower }}"
-                    data-gold="{{ (bm.gold_answer or '') | lower }}"
+                    data-question="{{ bm.question or '' }}"
+                    data-gold="{{ bm.gold_answer or '' }}"
                     data-date="{{ bm.created_at[:10] if bm.created_at is string else bm.created_at }}">
                     <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">{{ bm.name }}</td>
                     <td class="px-6 py-4 text-xs font-mono text-gray-600 dark:text-gray-400">{{ bm.benchmark_type }}</td>
@@ -543,12 +545,62 @@
     rows.forEach(row => tbody.appendChild(row));
   }
 
+  // Populate filter dropdowns from table data
+  function populateFilterDropdowns() {
+    const rows = document.querySelectorAll('.benchmark-row');
+    const names = new Set();
+    const types = new Set();
+    const questions = new Set();
+    const golds = new Set();
+    
+    rows.forEach(row => {
+      if (row.dataset.name) names.add(row.dataset.name);
+      if (row.dataset.type) types.add(row.dataset.type);
+      if (row.dataset.question) questions.add(row.dataset.question);
+      if (row.dataset.gold) golds.add(row.dataset.gold);
+    });
+    
+    const nameSelect = document.getElementById('filter-name');
+    Array.from(names).sort().forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n;
+      opt.textContent = n.length > 30 ? n.substring(0, 30) + '...' : n;
+      nameSelect.appendChild(opt);
+    });
+    
+    const typeSelect = document.getElementById('filter-type');
+    Array.from(types).sort().forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t;
+      typeSelect.appendChild(opt);
+    });
+    
+    const questionSelect = document.getElementById('filter-question');
+    Array.from(questions).sort().forEach(q => {
+      if (!q) return;
+      const opt = document.createElement('option');
+      opt.value = q;
+      opt.textContent = q.length > 40 ? q.substring(0, 40) + '...' : q;
+      questionSelect.appendChild(opt);
+    });
+    
+    const goldSelect = document.getElementById('filter-gold');
+    Array.from(golds).sort().forEach(g => {
+      if (!g) return;
+      const opt = document.createElement('option');
+      opt.value = g;
+      opt.textContent = g.length > 40 ? g.substring(0, 40) + '...' : g;
+      goldSelect.appendChild(opt);
+    });
+  }
+
   // Filtering
   function applyFilters() {
-    const nameFilter = document.getElementById('filter-name').value.toLowerCase();
+    const nameFilter = document.getElementById('filter-name').value;
     const typeFilter = document.getElementById('filter-type').value;
-    const questionFilter = document.getElementById('filter-question').value.toLowerCase();
-    const goldFilter = document.getElementById('filter-gold').value.toLowerCase();
+    const questionFilter = document.getElementById('filter-question').value;
+    const goldFilter = document.getElementById('filter-gold').value;
     const dateFrom = document.getElementById('filter-date-from').value;
     const dateTo = document.getElementById('filter-date-to').value;
 
@@ -564,10 +616,10 @@
 
       let show = true;
 
-      if (nameFilter && !name.includes(nameFilter)) show = false;
+      if (nameFilter && name !== nameFilter) show = false;
       if (typeFilter && type !== typeFilter) show = false;
-      if (questionFilter && !question.includes(questionFilter)) show = false;
-      if (goldFilter && !gold.includes(goldFilter)) show = false;
+      if (questionFilter && question !== questionFilter) show = false;
+      if (goldFilter && gold !== goldFilter) show = false;
       if (dateFrom && date < dateFrom) show = false;
       if (dateTo && date > dateTo) show = false;
 
@@ -608,6 +660,7 @@
 
   // Initial count
   document.addEventListener('DOMContentLoaded', function() {
+    populateFilterDropdowns();
     applyFilters();
   });
 </script>
