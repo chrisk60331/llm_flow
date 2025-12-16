@@ -10,47 +10,47 @@
 
 <!-- Filters -->
 <div class="card mb-4">
-    <div class="card-body">
-        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 items-end">
-            <div class="form-group">
-                <label class="form-label text-xs">Benchmark</label>
-                <select id="filter-benchmark" class="form-select text-sm" onchange="applyFilters()">
+    <div class="card-body py-3">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Benchmark</label>
+                <select id="filter-benchmark" class="form-select text-sm py-1.5" onchange="applyFilters()">
                     <option value="">All</option>
                 </select>
             </div>
-            <div class="form-group">
-                <label class="form-label text-xs">Experiment</label>
-                <select id="filter-experiment" class="form-select text-sm" onchange="applyFilters()">
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Experiment</label>
+                <select id="filter-experiment" class="form-select text-sm py-1.5" onchange="applyFilters()">
                     <option value="">All</option>
                 </select>
             </div>
-            <div class="form-group">
-                <label class="form-label text-xs">BLEU Score</label>
-                <select id="filter-bleu" class="form-select text-sm" onchange="applyFilters()">
-                    <option value="">All</option>
-                    <option value=">=50">≥ 50 (Good)</option>
-                    <option value=">=20">≥ 20</option>
-                    <option value="<20">< 20</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label class="form-label text-xs">ROUGE Score</label>
-                <select id="filter-rouge" class="form-select text-sm" onchange="applyFilters()">
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">BLEU Score</label>
+                <select id="filter-bleu" class="form-select text-sm py-1.5" onchange="applyFilters()">
                     <option value="">All</option>
                     <option value=">=50">≥ 50 (Good)</option>
                     <option value=">=20">≥ 20</option>
                     <option value="<20">< 20</option>
                 </select>
             </div>
-            <div class="form-group">
-                <label class="form-label text-xs">Status</label>
-                <select id="filter-status" class="form-select text-sm" onchange="applyFilters()">
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">ROUGE Score</label>
+                <select id="filter-rouge" class="form-select text-sm py-1.5" onchange="applyFilters()">
+                    <option value="">All</option>
+                    <option value=">=50">≥ 50 (Good)</option>
+                    <option value=">=20">≥ 20</option>
+                    <option value="<20">< 20</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Status</label>
+                <select id="filter-status" class="form-select text-sm py-1.5" onchange="applyFilters()">
                     <option value="">All</option>
                 </select>
             </div>
-            <div class="form-group">
-                <label class="form-label text-xs">Completed</label>
-                <select id="filter-completed" class="form-select text-sm" onchange="applyFilters()">
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Completed</label>
+                <select id="filter-completed" class="form-select text-sm py-1.5" onchange="applyFilters()">
                     <option value="">All</option>
                     <option value="today">Today</option>
                     <option value="week">This Week</option>
@@ -58,11 +58,10 @@
                     <option value="pending">Pending</option>
                 </select>
             </div>
-            <div class="form-group">
-                <button onclick="clearFilters()" class="w-full px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-all">
-                    Clear All
-                </button>
-            </div>
+        </div>
+        <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+            <span id="eval-count" class="text-sm text-gray-500 dark:text-gray-400">Showing {{ evaluations | length }} evaluations</span>
+            <button onclick="clearFilters()" class="text-sm text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 font-medium">Clear Filters</button>
         </div>
     </div>
 </div>
@@ -348,6 +347,12 @@
                 row.classList.add('hidden');
             }
         });
+        
+        // Update count
+        const totalCount = rows.length;
+        document.getElementById('eval-count').textContent = visibleCount === totalCount 
+            ? `Showing all ${totalCount} evaluations` 
+            : `Showing ${visibleCount} of ${totalCount} evaluations`;
         
         // Show/hide no results message
         const noResults = document.getElementById('no-results');
