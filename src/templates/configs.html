@@ -71,26 +71,47 @@
         <table class="w-full" id="configs-table">
             <thead>
                 <tr class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(0, 'string')">
-                        <div class="flex items-center gap-1">Name <span class="sort-icon">↕</span></div>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="sortTable(0, 'string')">
+                        <div class="flex items-center gap-1">
+                            Name
+                            <svg class="w-4 h-4 sort-icon" data-col="0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+                        </div>
                     </th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(1, 'string')">
-                        <div class="flex items-center gap-1">Type <span class="sort-icon">↕</span></div>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="sortTable(1, 'string')">
+                        <div class="flex items-center gap-1">
+                            Type
+                            <svg class="w-4 h-4 sort-icon" data-col="1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+                        </div>
                     </th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(2, 'string')">
-                        <div class="flex items-center gap-1">Model <span class="sort-icon">↕</span></div>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="sortTable(2, 'string')">
+                        <div class="flex items-center gap-1">
+                            Model
+                            <svg class="w-4 h-4 sort-icon" data-col="2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+                        </div>
                     </th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(3, 'date')">
-                        <div class="flex items-center gap-1">Created <span class="sort-icon">↕</span></div>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="sortTable(3, 'date')">
+                        <div class="flex items-center gap-1">
+                            Created
+                            <svg class="w-4 h-4 sort-icon" data-col="3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+                        </div>
                     </th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(4, 'number')">
-                        <div class="flex items-center justify-center gap-1">Experiments <span class="sort-icon">↕</span></div>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="sortTable(4, 'number')">
+                        <div class="flex items-center justify-center gap-1">
+                            Experiments
+                            <svg class="w-4 h-4 sort-icon" data-col="4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+                        </div>
                     </th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(5, 'number')">
-                        <div class="flex items-center justify-center gap-1">Min Eval Loss <span class="sort-icon">↕</span></div>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="sortTable(5, 'number')">
+                        <div class="flex items-center justify-center gap-1">
+                            Min Eval Loss
+                            <svg class="w-4 h-4 sort-icon" data-col="5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+                        </div>
                     </th>
-                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" onclick="sortTable(6, 'number')">
-                        <div class="flex items-center justify-center gap-1">Primary Score <span class="sort-icon">↕</span></div>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="sortTable(6, 'number')">
+                        <div class="flex items-center justify-center gap-1">
+                            Primary Score
+                            <svg class="w-4 h-4 sort-icon" data-col="6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+                        </div>
                     </th>
                     <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -253,19 +274,29 @@ function clearFilters() {
     filterConfigs();
 }
 
-let sortColumn = -1;
-let sortAsc = true;
+let currentSortCol = null;
+let currentSortDir = 'asc';
 
 function sortTable(colIndex, type) {
-    const table = document.getElementById('configs-table');
-    const tbody = table.querySelector('tbody');
+    const tbody = document.getElementById('configs-tbody');
     const rows = Array.from(tbody.querySelectorAll('.config-row'));
     
-    if (sortColumn === colIndex) {
-        sortAsc = !sortAsc;
+    if (rows.length === 0) return;
+
+    if (currentSortCol === colIndex) {
+        currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
     } else {
-        sortColumn = colIndex;
-        sortAsc = true;
+        currentSortCol = colIndex;
+        currentSortDir = 'asc';
+    }
+
+    // Update sort icons
+    document.querySelectorAll('.sort-icon').forEach(icon => {
+        icon.classList.remove('text-blue-500', 'dark:text-blue-400');
+    });
+    const activeIcon = document.querySelector(`.sort-icon[data-col="${colIndex}"]`);
+    if (activeIcon) {
+        activeIcon.classList.add('text-blue-500', 'dark:text-blue-400');
     }
     
     rows.sort((a, b) => {
@@ -277,30 +308,20 @@ function sortTable(colIndex, type) {
         if (type === 'number') {
             aVal = parseFloat(aVal) || 0;
             bVal = parseFloat(bVal) || 0;
-            return sortAsc ? aVal - bVal : bVal - aVal;
         } else if (type === 'date') {
             aVal = new Date(aVal).getTime() || 0;
             bVal = new Date(bVal).getTime() || 0;
-            return sortAsc ? aVal - bVal : bVal - aVal;
         } else {
-            return sortAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
         }
+
+        if (aVal < bVal) return currentSortDir === 'asc' ? -1 : 1;
+        if (aVal > bVal) return currentSortDir === 'asc' ? 1 : -1;
+        return 0;
     });
     
     rows.forEach(row => tbody.appendChild(row));
-    
-    // Update sort icons
-    const headers = table.querySelectorAll('th');
-    headers.forEach((th, i) => {
-        const icon = th.querySelector('.sort-icon');
-        if (icon) {
-            if (i === colIndex) {
-                icon.textContent = sortAsc ? '↑' : '↓';
-            } else {
-                icon.textContent = '↕';
-            }
-        }
-    });
 }
 </script>
 {% endblock %}
