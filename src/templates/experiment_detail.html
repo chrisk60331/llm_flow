@@ -29,12 +29,10 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
             Evaluate
         </button>
-        <form action="/experiments/{{ experiment.id }}/extract-meta" method="post" class="inline" id="extract-meta-form">
-            <button type="submit" id="extract-meta-btn" class="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                Extract for Meta
-            </button>
-        </form>
+        <button type="button" id="extract-meta-btn" onclick="openExtractMetaModal()" class="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 transition-all duration-200 shadow-sm hover:shadow-md flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            Extract for Meta
+        </button>
         {% endif %}
         <a href="/experiments/{{ experiment.id }}/copy" class="btn-primary flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
@@ -503,6 +501,55 @@
                     <button id="eval-close-btn" onclick="closeEvaluateModal()" class="hidden px-4 py-2 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">Close</button>
                     <a id="eval-view-btn" href="#" class="hidden btn-primary">View Details</a>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Extract Meta Modal -->
+{% if experiment.status == 'completed' %}
+<div id="extract-meta-modal" class="fixed inset-0 bg-gray-900/60 dark:bg-gray-900/80 backdrop-blur-sm hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl mx-4 border border-gray-200 dark:border-gray-700">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div>
+                <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">Extract Meta Features</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Runs a short probe (can take several minutes)</p>
+            </div>
+            <button type="button" onclick="closeExtractMetaModal()" class="text-gray-500 hover:text-gray-900 dark:hover:text-white">✕</button>
+        </div>
+
+        <div class="p-6">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-purple-600 to-indigo-700 rounded-full flex items-center justify-center">
+                    <svg id="extract-meta-icon" class="w-8 h-8 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </div>
+                <h3 id="extract-meta-title" class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">Starting...</h3>
+                <p id="extract-meta-message" class="text-gray-600 dark:text-gray-400">Queuing job</p>
+            </div>
+
+            <div class="mb-6">
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                    <div id="extract-meta-progress-bar" class="bg-gradient-to-r from-purple-600 to-indigo-700 h-3 rounded-full transition-all duration-500 animate-pulse" style="width: 5%"></div>
+                </div>
+                <p class="text-sm text-gray-500 dark:text-gray-400 text-center mt-2" id="extract-meta-status-text">Status: Starting</p>
+            </div>
+
+            <div id="extract-meta-result-section" class="hidden">
+                <div class="mb-4">
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Meta Feature Vector</p>
+                    <pre id="extract-meta-result-json" class="text-xs text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-900/30 p-3 rounded-lg border border-gray-200 dark:border-gray-700 overflow-x-auto max-h-80"></pre>
+                </div>
+            </div>
+
+            <div id="extract-meta-error-section" class="hidden mt-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+                <p class="text-sm text-red-700 dark:text-red-300" id="extract-meta-error-message"></p>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button id="extract-meta-close-btn" onclick="closeExtractMetaModal()" class="px-4 py-2 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">Close</button>
             </div>
         </div>
     </div>
@@ -1113,6 +1160,118 @@
         document.getElementById('eval-error-message').textContent = message;
         document.getElementById('eval-error-section').classList.remove('hidden');
         document.getElementById('eval-close-btn').classList.remove('hidden');
+    }
+</script>
+
+<script>
+    let metaExtractPollingInterval = null;
+    let currentMetaJobId = null;
+
+    function openExtractMetaModal() {
+        // Reset UI
+        document.getElementById('extract-meta-result-section').classList.add('hidden');
+        document.getElementById('extract-meta-error-section').classList.add('hidden');
+        document.getElementById('extract-meta-title').textContent = 'Starting...';
+        document.getElementById('extract-meta-message').textContent = 'Queuing job';
+        document.getElementById('extract-meta-status-text').textContent = 'Status: Starting';
+        const bar = document.getElementById('extract-meta-progress-bar');
+        bar.classList.add('animate-pulse');
+        bar.classList.remove('from-emerald-500', 'to-green-600', 'from-red-500', 'to-red-600');
+        bar.classList.add('from-purple-600', 'to-indigo-700');
+        bar.style.width = '5%';
+
+        document.getElementById('extract-meta-modal').classList.remove('hidden');
+        document.getElementById('extract-meta-modal').classList.add('flex');
+
+        startMetaExtraction();
+    }
+
+    function closeExtractMetaModal() {
+        if (metaExtractPollingInterval) {
+            clearInterval(metaExtractPollingInterval);
+            metaExtractPollingInterval = null;
+        }
+        currentMetaJobId = null;
+        document.getElementById('extract-meta-modal').classList.add('hidden');
+        document.getElementById('extract-meta-modal').classList.remove('flex');
+    }
+
+    async function startMetaExtraction() {
+        try {
+            const resp = await fetch('/api/meta/extract/{{ experiment.id }}/start', { method: 'POST' });
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.detail || 'Failed to start meta extraction');
+            }
+            const data = await resp.json();
+            currentMetaJobId = data.job_id;
+            document.getElementById('extract-meta-title').textContent = 'Extracting...';
+            document.getElementById('extract-meta-message').textContent = 'Probe running';
+            document.getElementById('extract-meta-status-text').textContent = 'Status: Running';
+            metaExtractPollingInterval = setInterval(pollMetaExtractStatus, 1500);
+            await pollMetaExtractStatus();
+        } catch (e) {
+            showMetaExtractError(e.message);
+        }
+    }
+
+    async function pollMetaExtractStatus() {
+        if (!currentMetaJobId) return;
+        try {
+            const resp = await fetch('/api/meta/extract/jobs/' + currentMetaJobId);
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            const bar = document.getElementById('extract-meta-progress-bar');
+            const pct = Math.max(0, Math.min(100, data.progress || 0));
+            bar.style.width = Math.max(5, pct) + '%';
+            document.getElementById('extract-meta-status-text').textContent = 'Status: ' + (data.status || 'running') + ' (' + pct + '%)';
+            if (data.phase_message) {
+                document.getElementById('extract-meta-message').textContent = data.phase_message;
+            }
+
+            if (data.status === 'completed') {
+                clearInterval(metaExtractPollingInterval);
+                metaExtractPollingInterval = null;
+                showMetaExtractComplete(data.features);
+            } else if (data.status === 'failed') {
+                clearInterval(metaExtractPollingInterval);
+                metaExtractPollingInterval = null;
+                showMetaExtractError(data.error || 'Meta extraction failed');
+            }
+        } catch (e) {
+            // keep polling; transient errors are okay here
+        }
+    }
+
+    function showMetaExtractComplete(features) {
+        const bar = document.getElementById('extract-meta-progress-bar');
+        bar.style.width = '100%';
+        bar.classList.remove('animate-pulse');
+        bar.classList.remove('from-purple-600', 'to-indigo-700');
+        bar.classList.add('from-emerald-500', 'to-green-600');
+
+        document.getElementById('extract-meta-title').textContent = 'Complete!';
+        document.getElementById('extract-meta-message').textContent = 'Meta features saved';
+        document.getElementById('extract-meta-status-text').textContent = 'Status: Completed';
+
+        const pre = document.getElementById('extract-meta-result-json');
+        pre.textContent = JSON.stringify(features || {}, null, 2);
+        document.getElementById('extract-meta-result-section').classList.remove('hidden');
+    }
+
+    function showMetaExtractError(message) {
+        const bar = document.getElementById('extract-meta-progress-bar');
+        bar.classList.remove('animate-pulse');
+        bar.classList.remove('from-purple-600', 'to-indigo-700');
+        bar.classList.add('from-red-500', 'to-red-600');
+        bar.style.width = '100%';
+
+        document.getElementById('extract-meta-title').textContent = 'Failed';
+        document.getElementById('extract-meta-message').textContent = '';
+        document.getElementById('extract-meta-status-text').textContent = 'Status: Failed';
+        document.getElementById('extract-meta-error-message').textContent = message;
+        document.getElementById('extract-meta-error-section').classList.remove('hidden');
     }
 </script>
 {% endif %}

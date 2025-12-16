@@ -14,17 +14,21 @@ from ..models import BenchmarkStatus, CausalLMFullConfig, ExperimentStatus
 from ..optimizer import SearchSpace, optimize_config, quick_sensitivity_analysis
 from ..predictor import PerformancePredictor
 from ..explainer import PredictionExplainer
-from ..probe import run_probe
+from ..probe import run_probe, run_probe_with_progress
 from ..storage import (
     delete_meta_features,
     get_experiment,
     get_dataset,
+    get_meta_extract_job,
     get_meta_features,
     get_optimization_job,
     list_benchmark_evals,
     list_meta_features,
+    save_meta_extract_job,
     save_meta_features,
     save_optimization_job,
+    MetaExtractJob,
+    MetaExtractStatus,
     OptimizationJob,
     OptimizationStatus,
 )
@@ -217,6 +221,147 @@ def extract_meta_features(experiment_id: str) -> MetaFeatureVector:
     save_meta_features(features)
     return features
 
+
+class MetaExtractStartResponse(BaseModel):
+    job_id: str
+    message: str
+
+
+class MetaExtractStatusResponse(BaseModel):
+    job_id: str
+    experiment_id: str
+    status: str
+    progress: int
+    phase_message: str | None = None
+    started_at: str
+    completed_at: str | None = None
+    error: str | None = None
+    features: MetaFeatureVector | None = None
+
+
+def _run_meta_extract_job(job_id: str, experiment_id: str) -> None:
+    job = get_meta_extract_job(job_id)
+    if not job:
+        return
+
+    def _update(pct: int, msg: str) -> None:
+        j = get_meta_extract_job(job_id)
+        if not j:
+            return
+        j.status = MetaExtractStatus.RUNNING
+        j.progress = int(pct)
+        j.phase_message = msg
+        save_meta_extract_job(j)
+
+    job.status = MetaExtractStatus.RUNNING
+    job.progress = 1
+    job.phase_message = "Starting"
+    save_meta_extract_job(job)
+
+    try:
+        exp = get_experiment(experiment_id)
+        if not exp:
+            raise ValueError("Experiment not found")
+        if exp.status != ExperimentStatus.COMPLETED:
+            raise ValueError("Experiment not completed")
+
+        dataset_info = get_dataset(exp.dataset_id)
+        if not dataset_info:
+            raise ValueError("Dataset not found")
+
+        evals = list_benchmark_evals()
+        exp_evals = [
+            e
+            for e in evals
+            if e.experiment_id == experiment_id and e.status == BenchmarkStatus.COMPLETED
+        ]
+        final_bleu = sum(e.bleu_score for e in exp_evals) / len(exp_evals) if exp_evals else None
+        final_rouge = sum(e.rouge_score for e in exp_evals) / len(exp_evals) if exp_evals else None
+
+        _update(3, "Preparing probe")
+        features = run_probe_with_progress(
+            config=exp.config,
+            csv_path=Path(dataset_info.path),
+            probe_steps=10,
+            experiment_id=experiment_id,
+            update_progress=_update,
+        )
+
+        _update(99, "Saving meta-features")
+        features.final_eval_loss = exp.metrics.get("eval_loss")
+        features.final_bleu_score = final_bleu
+        features.final_rouge_score = final_rouge
+        save_meta_features(features)
+
+        job = get_meta_extract_job(job_id)
+        if not job:
+            return
+        job.status = MetaExtractStatus.COMPLETED
+        job.progress = 100
+        job.phase_message = "Complete"
+        job.completed_at = datetime.now(timezone.utc)
+        save_meta_extract_job(job)
+    except Exception as e:
+        job = get_meta_extract_job(job_id)
+        if not job:
+            return
+        job.status = MetaExtractStatus.FAILED
+        job.completed_at = datetime.now(timezone.utc)
+        job.error = str(e)
+        job.phase_message = "Failed"
+        job.progress = 100
+        save_meta_extract_job(job)
+
+
+@router.post("/extract/{experiment_id}/start", response_model=MetaExtractStartResponse)
+def start_meta_extract(experiment_id: str) -> MetaExtractStartResponse:
+    exp = get_experiment(experiment_id)
+    if not exp:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    if exp.status != ExperimentStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="Experiment not completed")
+
+    job_id = str(uuid.uuid4())
+    job = MetaExtractJob(
+        id=job_id,
+        experiment_id=experiment_id,
+        status=MetaExtractStatus.PENDING,
+        progress=0,
+        started_at=datetime.now(timezone.utc),
+        phase_message="Queued",
+    )
+    save_meta_extract_job(job)
+
+    thread = Thread(target=_run_meta_extract_job, args=(job_id, experiment_id), daemon=True)
+    thread.start()
+
+    return MetaExtractStartResponse(
+        job_id=job_id,
+        message="Meta extraction started. Poll /meta/extract/jobs/{job_id} for status.",
+    )
+
+
+@router.get("/extract/jobs/{job_id}", response_model=MetaExtractStatusResponse)
+def get_meta_extract_status(job_id: str) -> MetaExtractStatusResponse:
+    job = get_meta_extract_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Meta extract job not found")
+
+    features = None
+    if job.status == MetaExtractStatus.COMPLETED:
+        features = get_meta_features(job.experiment_id)
+
+    return MetaExtractStatusResponse(
+        job_id=job.id,
+        experiment_id=job.experiment_id,
+        status=job.status.value,
+        progress=int(job.progress),
+        phase_message=job.phase_message,
+        started_at=job.started_at.isoformat(),
+        completed_at=job.completed_at.isoformat() if job.completed_at else None,
+        error=job.error,
+        features=features,
+    )
 
 @router.post("/probe", response_model=MetaProbeResponse)
 def run_meta_probe(request: MetaProbeRequest) -> MetaProbeResponse:

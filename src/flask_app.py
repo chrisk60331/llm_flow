@@ -605,8 +605,13 @@ def experiments_compare_page():
 
 @app.route("/experiments/<experiment_id>/extract-meta", methods=["POST"])
 def extract_meta_features(experiment_id: str):
-    requests.post(f"{API_BASE_URL}/meta/extract/{experiment_id}", timeout=30)
-    return redirect(url_for("meta_page"))
+    # Start background job (non-blocking). The UI uses AJAX now; this route is kept
+    # for compatibility and must not block on long probe runs.
+    try:
+        requests.post(f"{API_BASE_URL}/meta/extract/{experiment_id}/start", timeout=10)
+    except Exception:
+        pass
+    return redirect(url_for("experiment_detail", experiment_id=experiment_id))
 
 
 # ============================================================================
@@ -1054,6 +1059,18 @@ def api_autotune_list():
 def api_meta_train_predictor():
     payload = request.get_json()
     resp = requests.post(f"{API_BASE_URL}/meta/train-predictor", json=payload, timeout=120)
+    return jsonify(resp.json()), resp.status_code
+
+
+@app.route("/api/meta/extract/<experiment_id>/start", methods=["POST"])
+def api_meta_extract_start(experiment_id: str):
+    resp = requests.post(f"{API_BASE_URL}/meta/extract/{experiment_id}/start", timeout=10)
+    return jsonify(resp.json()), resp.status_code
+
+
+@app.route("/api/meta/extract/jobs/<job_id>")
+def api_meta_extract_status(job_id: str):
+    resp = requests.get(f"{API_BASE_URL}/meta/extract/jobs/{job_id}", timeout=10)
     return jsonify(resp.json()), resp.status_code
 
 

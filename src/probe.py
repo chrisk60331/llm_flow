@@ -57,6 +57,29 @@ class GradientNormCallback(TrainerCallback):
         self.grad_norms.append(total_norm)
 
 
+class _ProbeProgressCallback(TrainerCallback):
+    """Callback that emits probe progress updates."""
+
+    def __init__(self, probe_steps: int, update_progress) -> None:
+        self._probe_steps = int(probe_steps)
+        self._update_progress = update_progress
+
+    def on_step_end(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        model=None,
+        **kwargs,
+    ) -> None:
+        if self._probe_steps <= 0:
+            return
+        step = int(state.global_step or 0)
+        # Training dominates runtime; map steps into 60..95.
+        pct = 60 + int(min(1.0, step / float(self._probe_steps)) * 35.0)
+        self._update_progress(pct, f"Probe training step {step}/{self._probe_steps}")
+
+
 def _prepare_tokenizer(config: CausalLMFullConfig) -> tuple[AutoTokenizer, bool]:
     """Prepare tokenizer, adding pad token if needed."""
     tokenizer = AutoTokenizer.from_pretrained(
@@ -280,6 +303,142 @@ def run_probe(
         lora_alpha=static_config.lora_alpha,
         model_name=static_config.model_name,
         # Dynamic probe features
+        probe_steps=dynamic_features.probe_steps,
+        probe_initial_loss=dynamic_features.probe_initial_loss,
+        probe_final_loss=dynamic_features.probe_final_loss,
+        probe_loss_slope=dynamic_features.probe_loss_slope,
+        probe_loss_variance=dynamic_features.probe_loss_variance,
+        probe_grad_norm_mean=dynamic_features.probe_grad_norm_mean,
+        probe_grad_norm_std=dynamic_features.probe_grad_norm_std,
+    )
+
+
+def run_probe_with_progress(
+    config: CausalLMFullConfig,
+    csv_path: Path,
+    probe_steps: int,
+    experiment_id: str,
+    update_progress,
+) -> MetaFeatureVector:
+    """Run a short training probe and extract meta-features, emitting progress updates."""
+    if probe_steps <= 0:
+        raise ValueError("probe_steps must be > 0")
+
+    set_seed(config.data.seed)
+
+    update_progress(5, "Loading tokenizer")
+    tokenizer, added_pad_token = _prepare_tokenizer(config)
+
+    update_progress(15, "Extracting static dataset features")
+    text_fields = (config.data.question_field, config.data.answer_field)
+    static_dataset = extract_static_dataset_features(
+        csv_path=csv_path,
+        text_fields=text_fields,
+        separator="\n",
+        tokenizer=tokenizer,
+        max_length=config.data.max_length,
+    )
+
+    update_progress(25, "Extracting static config features")
+    static_config = extract_static_config_features(config)
+
+    update_progress(35, "Loading and tokenizing dataset")
+    llm_data_config = _build_llm_data_config(config, csv_path)
+    raw_splits = load_llm_dataset(llm_data_config)
+    tokenized = tokenize_dataset(
+        dataset=raw_splits,
+        tokenizer=tokenizer,
+        max_length=config.data.max_length,
+    )
+
+    update_progress(55, "Loading model (CPU)")
+    model = AutoModelForCausalLM.from_pretrained(
+        config.model.pretrained_model_name,
+        trust_remote_code=config.model.trust_remote_code,
+        device_map="cpu",
+        torch_dtype=torch.float32,
+    )
+    if added_pad_token:
+        model.resize_token_embeddings(len(tokenizer))
+    if config.training.gradient_checkpointing:
+        model.config.use_cache = False
+    model = _apply_probe_lora(model)
+
+    data_collator = DataCollatorForLanguageModeling(
+        tokenizer=tokenizer,
+        mlm=False,
+    )
+
+    grad_callback = GradientNormCallback()
+    progress_callback = _ProbeProgressCallback(probe_steps=probe_steps, update_progress=update_progress)
+
+    update_progress(60, "Starting probe training")
+    with TemporaryDirectory() as tmpdir:
+        training_args = TrainingArguments(
+            output_dir=tmpdir,
+            per_device_train_batch_size=config.training.per_device_train_batch_size,
+            per_device_eval_batch_size=config.training.per_device_eval_batch_size,
+            learning_rate=config.training.learning_rate,
+            weight_decay=config.training.weight_decay,
+            warmup_ratio=config.training.warmup_ratio,
+            gradient_accumulation_steps=config.training.gradient_accumulation_steps,
+            max_steps=probe_steps,
+            logging_steps=1,
+            save_strategy="no",
+            report_to=[],
+            bf16=False,
+            fp16=False,
+            dataloader_pin_memory=False,
+            use_cpu=True,
+        )
+
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            train_dataset=tokenized["train"],
+            eval_dataset=tokenized["test"],
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+            callbacks=[grad_callback, progress_callback],
+        )
+        trainer.train()
+
+        update_progress(97, "Computing probe features")
+        dynamic_features = _extract_probe_features(
+            log_history=trainer.state.log_history,
+            grad_norms=grad_callback.grad_norms,
+            probe_steps=probe_steps,
+        )
+
+    del trainer
+    del model
+    del tokenized
+    del data_collator
+    del tokenizer
+    gc.collect()
+
+    update_progress(99, "Assembling meta-feature vector")
+    return MetaFeatureVector(
+        experiment_id=experiment_id,
+        n_samples=static_dataset.n_samples,
+        avg_text_length=static_dataset.avg_text_length,
+        vocab_size=static_dataset.vocab_size,
+        type_token_ratio=static_dataset.type_token_ratio,
+        oov_rate=static_dataset.oov_rate,
+        avg_sequence_length=static_dataset.avg_sequence_length,
+        max_sequence_length=static_dataset.max_sequence_length,
+        truncation_rate=static_dataset.truncation_rate,
+        learning_rate=static_config.learning_rate,
+        num_epochs=static_config.num_epochs,
+        batch_size=static_config.batch_size,
+        gradient_accumulation_steps=static_config.gradient_accumulation_steps,
+        warmup_ratio=static_config.warmup_ratio,
+        weight_decay=static_config.weight_decay,
+        max_length=static_config.max_length,
+        lora_enabled=static_config.lora_enabled,
+        lora_r=static_config.lora_r,
+        lora_alpha=static_config.lora_alpha,
+        model_name=static_config.model_name,
         probe_steps=dynamic_features.probe_steps,
         probe_initial_loss=dynamic_features.probe_initial_loss,
         probe_final_loss=dynamic_features.probe_final_loss,

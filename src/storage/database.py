@@ -124,6 +124,17 @@ def init_db() -> None:
                 error TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS meta_extract_jobs (
+                id TEXT PRIMARY KEY,
+                experiment_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                progress INTEGER NOT NULL DEFAULT 0,
+                phase_message TEXT,
+                started_at TEXT NOT NULL,
+                completed_at TEXT,
+                error TEXT
+            );
+
             CREATE TABLE IF NOT EXISTS autopilot_jobs (
                 id TEXT PRIMARY KEY,
                 dataset_id TEXT NOT NULL,

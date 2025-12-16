@@ -33,6 +33,7 @@ from .job_store import (
     save_autotune_job,
     save_optimization_job,
 )
+from .meta_extract_job_store import MetaExtractJob, MetaExtractStatus, get_meta_extract_job, save_meta_extract_job
 from .meta_store import delete_meta_features, get_meta_features, list_meta_features, save_meta_features
 
 __all__ = [
@@ -72,6 +73,11 @@ __all__ = [
     "get_meta_features",
     "list_meta_features",
     "save_meta_features",
+    # Meta extract jobs
+    "MetaExtractJob",
+    "MetaExtractStatus",
+    "get_meta_extract_job",
+    "save_meta_extract_job",
     # Jobs
     "OptimizationJob",
     "OptimizationStatus",
