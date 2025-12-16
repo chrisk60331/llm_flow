@@ -3,9 +3,17 @@
 {% block title %}Benchmarks - EvalLedger{% endblock %}
 
 {% block content %}
-<div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Benchmarks</h1>
-    <p class="text-gray-600 dark:text-gray-400">Create and manage evaluation benchmarks</p>
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Benchmarks</h1>
+        <p class="text-gray-600 dark:text-gray-400">Create and manage evaluation benchmarks</p>
+    </div>
+    <button onclick="openModal()" class="btn-primary flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        New Benchmark
+    </button>
 </div>
 
 {% if error %}
@@ -16,153 +24,327 @@
 </div>
 {% endif %}
 
-<div class="card mb-6">
-    <div class="card-header">
-        <h2 class="font-semibold text-gray-800 dark:text-gray-200">Create New Benchmark</h2>
+<!-- Modal Backdrop -->
+<div id="modal-backdrop" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden" onclick="closeModal()"></div>
+
+<!-- New Benchmark Modal -->
+<div id="benchmark-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div class="flex min-h-full items-start justify-center p-4 pt-16">
+        <div class="relative w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700" onclick="event.stopPropagation()">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Create New Benchmark</h2>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <!-- Modal Body -->
+            <div class="p-6 max-h-[70vh] overflow-y-auto">
+                <form action="/benchmarks/create" method="post" class="space-y-4">
+                    <div class="form-group">
+                        <label class="form-label">Benchmark Type</label>
+                        <select id="benchmark_type" name="benchmark_type" class="form-select" required>
+                            <option value="causal_lm_qa">Causal LM (Q&A)</option>
+                            <option value="masked_lm_fill_mask">Masked LM (Fill Mask)</option>
+                            <option value="custom_lightning_sin_regression">Custom Lightning (sin(x) regression)</option>
+                            <option value="custom_lightning_plugin">Custom Lightning (benchmark plugin)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Benchmark Name</label>
+                        <input type="text" name="name" required class="form-input" placeholder="e.g., knowledge-test-1">
+                    </div>
+                    <div id="qa_section" class="space-y-4">
+                        <div class="form-group">
+                            <label class="form-label">Question</label>
+                            <textarea id="question" name="question" rows="3" class="form-textarea" placeholder="What is the capital of France?"></textarea>
+                            <p id="question_help" class="text-xs text-gray-500 mt-1"></p>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Gold Answer</label>
+                            <textarea id="gold_answer" name="gold_answer" rows="3" class="form-textarea" placeholder="The capital of France is Paris."></textarea>
+                        </div>
+                    </div>
+                    
+                    <div id="spec_section" class="section-card hidden">
+                        <div class="section-header">
+                            <h3 class="section-title">Spec (JSON)</h3>
+                        </div>
+                        <div class="section-body">
+                            <!-- Hidden field submitted to backend -->
+                            <textarea id="spec_json" name="spec_json" class="hidden" spellcheck="false"></textarea>
+
+                            <div id="spec_sin_builder" class="hidden space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div class="form-group">
+                                        <label class="form-label">x_min</label>
+                                        <input id="sin_x_min" type="number" step="0.0001" class="form-input" value="0.0" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">x_max</label>
+                                        <input id="sin_x_max" type="number" step="0.0001" class="form-input" value="1.0" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">n_points</label>
+                                        <input id="sin_n_points" type="number" min="2" class="form-input" value="1000" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="spec_plugin_builder" class="hidden space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="form-group">
+                                        <label class="form-label">Benchmark plugin</label>
+                                        <select id="bm_plugin_id" class="form-select">
+                                            <option value="">Select a benchmark plugin...</option>
+                                            {% for p in (benchmark_plugins or []) %}
+                                            <option value="{{ p.id }}">{{ p.name }} ({{ p.id[:8] }}...)</option>
+                                            {% endfor %}
+                                        </select>
+                                        {% if not (benchmark_plugins or []) %}
+                                        <p class="text-xs text-amber-600 mt-2">No benchmark plugins uploaded yet. Upload one in Plugins.</p>
+                                        {% endif %}
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Function</label>
+                                        <input id="bm_function_name" type="text" class="form-input" value="run_benchmark" />
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div class="form-group">
+                                        <label class="form-label">x_min</label>
+                                        <input id="bm_x_min" type="number" step="0.0001" class="form-input" value="0.0" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">x_max</label>
+                                        <input id="bm_x_max" type="number" step="0.0001" class="form-input" value="1.0" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">n_points</label>
+                                        <input id="bm_n_points" type="number" min="2" class="form-input" value="100" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Spec (generated)</label>
+                                <pre id="spec_pretty" class="text-xs text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 p-3 rounded overflow-x-auto"></pre>
+                                <p id="spec_help" class="text-xs text-gray-500 mt-2"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="scoring_section" class="section-card hidden">
+                        <div class="section-header">
+                            <h3 class="section-title">Scoring</h3>
+                        </div>
+                        <div class="section-body">
+                            <div class="form-group">
+                                <label class="inline-flex items-center gap-2">
+                                    <input id="higher_is_better" name="higher_is_better" type="checkbox" class="form-checkbox" checked>
+                                    <span class="text-sm text-gray-900 dark:text-gray-100">Higher is better</span>
+                                </label>
+                                <p class="text-xs text-gray-500 mt-1">
+                                    Only applies to <span class="font-mono">custom_lightning_plugin</span> benchmarks (controls ranking for <span class="font-mono">primary_score</span>).
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="inference_section" class="section-card">
+                        <div class="section-header">
+                            <h3 class="section-title">Inference Settings</h3>
+                        </div>
+                        <div class="section-body">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="form-group">
+                                    <label class="form-label">Max Response Tokens</label>
+                                    <input type="number" name="max_new_tokens" value="128" min="1" max="4096" class="form-input">
+                                    <p class="text-xs text-gray-500 mt-1">Maximum tokens to generate</p>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Temperature</label>
+                                    <input type="number" name="temperature" value="0.7" min="0.01" max="2.0" step="0.1" class="form-input">
+                                    <p class="text-xs text-gray-500 mt-1">Sampling temperature (0.1-2.0)</p>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Top-P</label>
+                                    <input type="number" name="top_p" value="0.9" min="0.01" max="1.0" step="0.05" class="form-input">
+                                    <p class="text-xs text-gray-500 mt-1">Nucleus sampling (0.1-1.0)</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Cancel</button>
+                        <button type="submit" class="btn-primary">Create Benchmark</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
-    <div class="card-body">
-        <form action="/benchmarks/create" method="post" class="space-y-4">
-            <div class="form-group">
-                <label class="form-label">Benchmark Type</label>
-                <select id="benchmark_type" name="benchmark_type" class="form-select" required>
-                    <option value="causal_lm_qa">Causal LM (Q&A)</option>
-                    <option value="masked_lm_fill_mask">Masked LM (Fill Mask)</option>
-                    <option value="custom_lightning_sin_regression">Custom Lightning (sin(x) regression)</option>
-                    <option value="custom_lightning_plugin">Custom Lightning (benchmark plugin)</option>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body py-3">
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Name</label>
+                <input type="text" id="filter-name" placeholder="Filter..." class="form-input text-sm py-1.5" oninput="applyFilters()">
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Type</label>
+                <select id="filter-type" class="form-select text-sm py-1.5" onchange="applyFilters()">
+                    <option value="">All</option>
+                    <option value="causal_lm_qa">causal_lm_qa</option>
+                    <option value="masked_lm_fill_mask">masked_lm_fill_mask</option>
+                    <option value="custom_lightning_sin_regression">custom_lightning_sin</option>
+                    <option value="custom_lightning_plugin">custom_lightning_plugin</option>
                 </select>
             </div>
-            <div class="form-group">
-                <label class="form-label">Benchmark Name</label>
-                <input type="text" name="name" required class="form-input" placeholder="e.g., knowledge-test-1">
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Question</label>
+                <input type="text" id="filter-question" placeholder="Filter..." class="form-input text-sm py-1.5" oninput="applyFilters()">
             </div>
-            <div id="qa_section" class="space-y-4">
-                <div class="form-group">
-                    <label class="form-label">Question</label>
-                    <textarea id="question" name="question" rows="3" class="form-textarea" placeholder="What is the capital of France?"></textarea>
-                    <p id="question_help" class="text-xs text-gray-500 mt-1"></p>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Gold Answer</label>
-                    <textarea id="gold_answer" name="gold_answer" rows="3" class="form-textarea" placeholder="The capital of France is Paris."></textarea>
-                </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Gold Answer</label>
+                <input type="text" id="filter-gold" placeholder="Filter..." class="form-input text-sm py-1.5" oninput="applyFilters()">
             </div>
-            
-            <div id="spec_section" class="section-card hidden">
-                <div class="section-header">
-                    <h3 class="section-title">Spec (JSON)</h3>
-                </div>
-                <div class="section-body">
-                    <!-- Hidden field submitted to backend -->
-                    <textarea id="spec_json" name="spec_json" class="hidden" spellcheck="false"></textarea>
-
-                    <div id="spec_sin_builder" class="hidden space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div class="form-group">
-                                <label class="form-label">x_min</label>
-                                <input id="sin_x_min" type="number" step="0.0001" class="form-input" value="0.0" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">x_max</label>
-                                <input id="sin_x_max" type="number" step="0.0001" class="form-input" value="1.0" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">n_points</label>
-                                <input id="sin_n_points" type="number" min="2" class="form-input" value="1000" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="spec_plugin_builder" class="hidden space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="form-group">
-                                <label class="form-label">Benchmark plugin</label>
-                                <select id="bm_plugin_id" class="form-select">
-                                    <option value="">Select a benchmark plugin...</option>
-                                    {% for p in (benchmark_plugins or []) %}
-                                    <option value="{{ p.id }}">{{ p.name }} ({{ p.id[:8] }}...)</option>
-                                    {% endfor %}
-                                </select>
-                                {% if not (benchmark_plugins or []) %}
-                                <p class="text-xs text-amber-600 mt-2">No benchmark plugins uploaded yet. Upload one in Plugins.</p>
-                                {% endif %}
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Function</label>
-                                <input id="bm_function_name" type="text" class="form-input" value="run_benchmark" />
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div class="form-group">
-                                <label class="form-label">x_min</label>
-                                <input id="bm_x_min" type="number" step="0.0001" class="form-input" value="0.0" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">x_max</label>
-                                <input id="bm_x_max" type="number" step="0.0001" class="form-input" value="1.0" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">n_points</label>
-                                <input id="bm_n_points" type="number" min="2" class="form-input" value="100" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Spec (generated)</label>
-                        <pre id="spec_pretty" class="text-xs text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 p-3 rounded overflow-x-auto"></pre>
-                        <p id="spec_help" class="text-xs text-gray-500 mt-2"></p>
-                    </div>
-                </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Date From</label>
+                <input type="date" id="filter-date-from" class="form-input text-sm py-1.5" onchange="applyFilters()">
             </div>
-
-            <div id="scoring_section" class="section-card hidden">
-                <div class="section-header">
-                    <h3 class="section-title">Scoring</h3>
-                </div>
-                <div class="section-body">
-                    <div class="form-group">
-                        <label class="inline-flex items-center gap-2">
-                            <input id="higher_is_better" name="higher_is_better" type="checkbox" class="form-checkbox" checked>
-                            <span class="text-sm text-gray-900 dark:text-gray-100">Higher is better</span>
-                        </label>
-                        <p class="text-xs text-gray-500 mt-1">
-                            Only applies to <span class="font-mono">custom_lightning_plugin</span> benchmarks (controls ranking for <span class="font-mono">primary_score</span>).
-                        </p>
-                    </div>
-                </div>
+            <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">Date To</label>
+                <input type="date" id="filter-date-to" class="form-input text-sm py-1.5" onchange="applyFilters()">
             </div>
+        </div>
+        <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+            <span id="filter-count" class="text-sm text-gray-500 dark:text-gray-400"></span>
+            <button onclick="clearFilters()" class="text-sm text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 font-medium">Clear Filters</button>
+        </div>
+    </div>
+</div>
 
-            <div id="inference_section" class="section-card">
-                <div class="section-header">
-                    <h3 class="section-title">Inference Settings</h3>
-                </div>
-                <div class="section-body">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="form-group">
-                            <label class="form-label">Max Response Tokens</label>
-                            <input type="number" name="max_new_tokens" value="128" min="1" max="4096" class="form-input">
-                            <p class="text-xs text-gray-500 mt-1">Maximum tokens to generate</p>
+<div class="card">
+    <div class="overflow-x-auto">
+        <table class="w-full" id="benchmarks-table">
+            <thead>
+                <tr class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="sortTable(0, 'string')">
+                        <div class="flex items-center gap-1">
+                            Name
+                            <svg class="w-4 h-4 sort-icon" data-col="0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Temperature</label>
-                            <input type="number" name="temperature" value="0.7" min="0.01" max="2.0" step="0.1" class="form-input">
-                            <p class="text-xs text-gray-500 mt-1">Sampling temperature (0.1-2.0)</p>
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="sortTable(1, 'string')">
+                        <div class="flex items-center gap-1">
+                            Type
+                            <svg class="w-4 h-4 sort-icon" data-col="1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Top-P</label>
-                            <input type="number" name="top_p" value="0.9" min="0.01" max="1.0" step="0.05" class="form-input">
-                            <p class="text-xs text-gray-500 mt-1">Nucleus sampling (0.1-1.0)</p>
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="sortTable(2, 'string')">
+                        <div class="flex items-center gap-1">
+                            Question
+                            <svg class="w-4 h-4 sort-icon" data-col="2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
                         </div>
-                    </div>
-                </div>
-            </div>
-            
-            <button type="submit" class="btn-primary">Create Benchmark</button>
-        </form>
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="sortTable(3, 'string')">
+                        <div class="flex items-center gap-1">
+                            Gold Answer
+                            <svg class="w-4 h-4 sort-icon" data-col="3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+                        </div>
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Inference Settings</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="sortTable(5, 'date')">
+                        <div class="flex items-center gap-1">
+                            Created
+                            <svg class="w-4 h-4 sort-icon" data-col="5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+                        </div>
+                    </th>
+                    <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-700" id="benchmarks-tbody">
+                {% for bm in benchmarks %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors benchmark-row"
+                    data-name="{{ bm.name | lower }}"
+                    data-type="{{ bm.benchmark_type }}"
+                    data-question="{{ (bm.question or '') | lower }}"
+                    data-gold="{{ (bm.gold_answer or '') | lower }}"
+                    data-date="{{ bm.created_at[:10] if bm.created_at is string else bm.created_at }}">
+                    <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">{{ bm.name }}</td>
+                    <td class="px-6 py-4 text-xs font-mono text-gray-600 dark:text-gray-400">{{ bm.benchmark_type }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ bm.question | truncate(50) }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ bm.gold_answer | truncate(50) }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                        <div class="flex flex-col gap-1">
+                            <span class="text-xs"><span class="text-gray-400">tokens:</span> {{ bm.max_new_tokens }}</span>
+                            <span class="text-xs"><span class="text-gray-400">temp:</span> {{ bm.temperature }}</span>
+                            <span class="text-xs"><span class="text-gray-400">top_p:</span> {{ bm.top_p }}</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400"><span data-utc="{{ bm.created_at }}" data-format="date">{{ bm.created_at[:10] if bm.created_at is string else bm.created_at }}</span></td>
+                    <td class="px-6 py-4 text-right">
+                        <div class="flex items-center justify-end gap-3">
+                            <a href="/benchmarks/{{ bm.id }}/edit" class="text-sm font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">Edit</a>
+                            <a href="/benchmarks/{{ bm.id }}/evaluate" class="text-sm font-medium text-primary-600 hover:text-primary-800">Evaluate</a>
+                            <a href="/benchmarks/{{ bm.id }}/results" class="text-sm font-medium text-emerald-600 hover:text-emerald-800">Results</a>
+                            <form action="/benchmarks/{{ bm.id }}/delete" method="post" class="inline" onsubmit="return confirm('Delete this benchmark?')">
+                                <button type="submit" class="text-sm font-medium text-red-500 hover:text-red-700">Delete</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr id="empty-row">
+                    <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        <div class="flex flex-col items-center">
+                            <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                            <p>No benchmarks created yet</p>
+                            <button onclick="openModal()" class="mt-3 text-primary-600 hover:text-primary-800 font-medium">Create your first benchmark</button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- No results message (hidden by default) -->
+<div id="no-results" class="card hidden">
+    <div class="card-body text-center py-12">
+        <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <p class="text-gray-500 dark:text-gray-400">No benchmarks match your filters</p>
+        <button onclick="clearFilters()" class="mt-3 text-primary-600 hover:text-primary-800 font-medium">Clear Filters</button>
     </div>
 </div>
 
 <script>
+  // Modal Functions
+  function openModal() {
+    document.getElementById('modal-backdrop').classList.remove('hidden');
+    document.getElementById('benchmark-modal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    document.getElementById('modal-backdrop').classList.add('hidden');
+    document.getElementById('benchmark-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  // Close modal on escape key
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeModal();
+  });
+
+  // Form Logic
   const typeSelect = document.getElementById('benchmark_type');
   const qaSection = document.getElementById('qa_section');
   const question = document.getElementById('question');
@@ -238,8 +420,6 @@
     questionHelp.textContent = '';
     specHelp.textContent = '';
 
-    // IMPORTANT: disable/clear validation for hidden spec-builder controls so they
-    // can't block form submission when you switch benchmark types.
     if (sinXMin) sinXMin.disabled = true;
     if (sinXMax) sinXMax.disabled = true;
     if (sinNPoints) sinNPoints.disabled = true;
@@ -253,7 +433,6 @@
     if (bmXMax) bmXMax.disabled = true;
     if (bmNPoints) bmNPoints.disabled = true;
 
-    // Disable inference fields by default; enable only for causal_lm_qa
     if (maxNewTokensInput) maxNewTokensInput.disabled = true;
     if (temperatureInput) temperatureInput.disabled = true;
     if (topPInput) topPInput.disabled = true;
@@ -275,7 +454,6 @@
       questionHelp.textContent = 'Include exactly one mask token: [MASK] (or <mask>)';
       return;
     }
-    // custom lightning benchmarks
     inferenceSection.classList.add('hidden');
     specSection.classList.remove('hidden');
     qaSection.classList.add('hidden');
@@ -293,7 +471,6 @@
       specHelp.textContent = 'Evaluates MSE against sin(x) on a fixed grid.';
       return;
     }
-    // custom_lightning_plugin
     pluginBuilder.classList.remove('hidden');
     if (bmPluginId) {
       bmPluginId.disabled = false;
@@ -313,61 +490,125 @@
   wire(['sin_x_min','sin_x_max','sin_n_points'], buildSinSpec);
   wire(['bm_plugin_id','bm_function_name','bm_x_min','bm_x_max','bm_n_points'], buildPluginSpec);
   applyTypeUI();
+
+  // Sorting
+  let currentSortCol = null;
+  let currentSortDir = 'asc';
+
+  function sortTable(colIndex, type) {
+    const tbody = document.getElementById('benchmarks-tbody');
+    const rows = Array.from(tbody.querySelectorAll('.benchmark-row'));
+    
+    if (rows.length === 0) return;
+
+    // Toggle sort direction if same column
+    if (currentSortCol === colIndex) {
+      currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      currentSortCol = colIndex;
+      currentSortDir = 'asc';
+    }
+
+    // Update sort icons
+    document.querySelectorAll('.sort-icon').forEach(icon => {
+      icon.classList.remove('text-primary-600', 'dark:text-primary-400');
+      icon.classList.add('text-gray-400');
+    });
+    const activeIcon = document.querySelector(`.sort-icon[data-col="${colIndex}"]`);
+    if (activeIcon) {
+      activeIcon.classList.remove('text-gray-400');
+      activeIcon.classList.add('text-primary-600', 'dark:text-primary-400');
+    }
+
+    rows.sort((a, b) => {
+      let aVal = a.cells[colIndex].textContent.trim();
+      let bVal = b.cells[colIndex].textContent.trim();
+
+      if (type === 'date') {
+        aVal = new Date(a.dataset.date || aVal).getTime();
+        bVal = new Date(b.dataset.date || bVal).getTime();
+      } else if (type === 'number') {
+        aVal = parseFloat(aVal) || 0;
+        bVal = parseFloat(bVal) || 0;
+      } else {
+        aVal = aVal.toLowerCase();
+        bVal = bVal.toLowerCase();
+      }
+
+      if (aVal < bVal) return currentSortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return currentSortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+  }
+
+  // Filtering
+  function applyFilters() {
+    const nameFilter = document.getElementById('filter-name').value.toLowerCase();
+    const typeFilter = document.getElementById('filter-type').value;
+    const questionFilter = document.getElementById('filter-question').value.toLowerCase();
+    const goldFilter = document.getElementById('filter-gold').value.toLowerCase();
+    const dateFrom = document.getElementById('filter-date-from').value;
+    const dateTo = document.getElementById('filter-date-to').value;
+
+    const rows = document.querySelectorAll('.benchmark-row');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+      const name = row.dataset.name;
+      const type = row.dataset.type;
+      const question = row.dataset.question;
+      const gold = row.dataset.gold;
+      const date = row.dataset.date;
+
+      let show = true;
+
+      if (nameFilter && !name.includes(nameFilter)) show = false;
+      if (typeFilter && type !== typeFilter) show = false;
+      if (questionFilter && !question.includes(questionFilter)) show = false;
+      if (goldFilter && !gold.includes(goldFilter)) show = false;
+      if (dateFrom && date < dateFrom) show = false;
+      if (dateTo && date > dateTo) show = false;
+
+      row.style.display = show ? '' : 'none';
+      if (show) visibleCount++;
+    });
+
+    // Update count
+    const totalCount = rows.length;
+    const countEl = document.getElementById('filter-count');
+    if (totalCount > 0) {
+      countEl.textContent = visibleCount === totalCount 
+        ? `Showing all ${totalCount} benchmarks` 
+        : `Showing ${visibleCount} of ${totalCount} benchmarks`;
+    }
+
+    // Show/hide no results message
+    const noResults = document.getElementById('no-results');
+    const table = document.querySelector('.card:has(#benchmarks-table)');
+    if (totalCount > 0 && visibleCount === 0) {
+      noResults.classList.remove('hidden');
+      table.classList.add('hidden');
+    } else {
+      noResults.classList.add('hidden');
+      table.classList.remove('hidden');
+    }
+  }
+
+  function clearFilters() {
+    document.getElementById('filter-name').value = '';
+    document.getElementById('filter-type').value = '';
+    document.getElementById('filter-question').value = '';
+    document.getElementById('filter-gold').value = '';
+    document.getElementById('filter-date-from').value = '';
+    document.getElementById('filter-date-to').value = '';
+    applyFilters();
+  }
+
+  // Initial count
+  document.addEventListener('DOMContentLoaded', function() {
+    applyFilters();
+  });
 </script>
-
-<div class="card">
-    <div class="overflow-x-auto">
-        <table class="w-full">
-            <thead>
-                <tr class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Name</th>
-                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Type</th>
-                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Question</th>
-                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Gold Answer</th>
-                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Inference Settings</th>
-                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Created</th>
-                    <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                {% for bm in benchmarks %}
-                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors">
-                    <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">{{ bm.name }}</td>
-                    <td class="px-6 py-4 text-xs font-mono text-gray-600 dark:text-gray-400">{{ bm.benchmark_type }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ bm.question | truncate(50) }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ bm.gold_answer | truncate(50) }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                        <div class="flex flex-col gap-1">
-                            <span class="text-xs"><span class="text-gray-400">tokens:</span> {{ bm.max_new_tokens }}</span>
-                            <span class="text-xs"><span class="text-gray-400">temp:</span> {{ bm.temperature }}</span>
-                            <span class="text-xs"><span class="text-gray-400">top_p:</span> {{ bm.top_p }}</span>
-                        </div>
-                    </td>
-                    <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400"><span data-utc="{{ bm.created_at }}" data-format="date">{{ bm.created_at[:10] if bm.created_at is string else bm.created_at }}</span></td>
-                    <td class="px-6 py-4 text-right">
-                        <div class="flex items-center justify-end gap-3">
-                            <a href="/benchmarks/{{ bm.id }}/edit" class="text-sm font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">Edit</a>
-                            <a href="/benchmarks/{{ bm.id }}/evaluate" class="text-sm font-medium text-primary-600 hover:text-primary-800">Evaluate</a>
-                            <a href="/benchmarks/{{ bm.id }}/results" class="text-sm font-medium text-emerald-600 hover:text-emerald-800">Results</a>
-                            <form action="/benchmarks/{{ bm.id }}/delete" method="post" class="inline" onsubmit="return confirm('Delete this benchmark?')">
-                                <button type="submit" class="text-sm font-medium text-red-500 hover:text-red-700">Delete</button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                        <div class="flex flex-col items-center">
-                            <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-                            <p>No benchmarks created yet</p>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
 {% endblock %}
-
