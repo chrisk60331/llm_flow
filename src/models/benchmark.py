@@ -13,6 +13,10 @@ class Benchmark(BaseModel):
     id: str
     name: str
     benchmark_type: BenchmarkType = Field(default=BenchmarkType.CAUSAL_LM_QA)
+    higher_is_better: bool = Field(
+        default=True,
+        description="Whether higher primary_score means better performance for this benchmark.",
+    )
     spec: dict[str, Any] = Field(default_factory=dict, description="Type-specific benchmark spec blob.")
     question: str = ""
     gold_answer: str = ""
@@ -25,6 +29,10 @@ class Benchmark(BaseModel):
 class BenchmarkCreateRequest(BaseModel):
     name: str = Field(description="Name for this benchmark")
     benchmark_type: BenchmarkType = Field(default=BenchmarkType.CAUSAL_LM_QA)
+    higher_is_better: bool | None = Field(
+        default=None,
+        description="Only meaningful for custom_lightning_plugin benchmarks; validated for other types.",
+    )
     spec: dict[str, Any] = Field(default_factory=dict, description="Type-specific benchmark spec blob.")
     question: str = Field(default="", description="The question to ask the model (type-dependent)")
     gold_answer: str = Field(default="", description="The expected/gold standard answer (type-dependent)")
@@ -36,6 +44,10 @@ class BenchmarkCreateRequest(BaseModel):
 class BenchmarkUpdateRequest(BaseModel):
     name: str | None = Field(default=None, description="Name for this benchmark")
     benchmark_type: BenchmarkType | None = Field(default=None, description="Benchmark type (immutable once created)")
+    higher_is_better: bool | None = Field(
+        default=None,
+        description="Only meaningful for custom_lightning_plugin benchmarks; validated for other types.",
+    )
     spec: dict[str, Any] | None = Field(default=None, description="Type-specific benchmark spec blob.")
     question: str | None = Field(default=None, description="The question to ask the model (type-dependent)")
     gold_answer: str | None = Field(default=None, description="The expected/gold standard answer (type-dependent)")
@@ -60,6 +72,7 @@ class BenchmarkEvalResult(BaseModel):
     benchmark_id: str
     benchmark_name: str
     benchmark_type: BenchmarkType = Field(default=BenchmarkType.CAUSAL_LM_QA)
+    higher_is_better: bool = True
     experiment_id: str
     question: str
     gold_answer: str
@@ -67,6 +80,7 @@ class BenchmarkEvalResult(BaseModel):
     bleu_score: float
     rouge_score: float
     primary_score: float = 0.0
+    rank: int | None = None
     metrics: dict[str, Any] = Field(default_factory=dict)
     num_runs: int = 1
     run_scores: list[BenchmarkRunScore] = Field(default_factory=list)

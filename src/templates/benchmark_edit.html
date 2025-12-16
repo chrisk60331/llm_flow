@@ -15,6 +15,7 @@
         </div>
         <div class="card-body">
             <form action="/benchmarks/{{ benchmark.id }}/edit" method="post" class="space-y-4">
+                <input type="hidden" name="benchmark_type" value="{{ benchmark.benchmark_type }}" />
                 <div class="form-group">
                     <label class="form-label">Benchmark Type</label>
                     <input type="text" class="form-input" value="{{ benchmark.benchmark_type }}" disabled />
@@ -69,6 +70,23 @@
                         </div>
                     </div>
                 </div>
+
+                <div id="scoring_section" class="section-card hidden">
+                    <div class="section-header">
+                        <h3 class="section-title">Scoring</h3>
+                    </div>
+                    <div class="section-body">
+                        <div class="form-group">
+                            <label class="inline-flex items-center gap-2">
+                                <input id="higher_is_better" name="higher_is_better" type="checkbox" class="form-checkbox" {% if benchmark.higher_is_better %}checked{% endif %}>
+                                <span class="text-sm text-gray-900 dark:text-gray-100">Higher is better</span>
+                            </label>
+                            <p class="text-xs text-gray-500 mt-1">
+                                Only applies to <span class="font-mono">custom_lightning_plugin</span> benchmarks (controls ranking for <span class="font-mono">primary_score</span>).
+                            </p>
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="flex justify-end gap-3 pt-4">
                     <a href="/benchmarks" class="px-4 py-2 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">Cancel</a>
@@ -85,12 +103,16 @@
   const gold = document.getElementById('gold_answer');
   const specSection = document.getElementById('spec_section');
   const inferenceSection = document.getElementById('inference_section');
+  const scoringSection = document.getElementById('scoring_section');
+  const higherIsBetter = document.getElementById('higher_is_better');
 
   function applyTypeUI() {
     question.required = true;
     gold.required = true;
     specSection.classList.add('hidden');
     inferenceSection.classList.remove('hidden');
+    scoringSection.classList.add('hidden');
+    if (higherIsBetter) higherIsBetter.disabled = true;
 
     if (benchmarkType === 'causal_lm_qa') {
       return;
@@ -104,6 +126,10 @@
     specSection.classList.remove('hidden');
     question.required = false;
     gold.required = false;
+    if (benchmarkType === 'custom_lightning_plugin') {
+      scoringSection.classList.remove('hidden');
+      if (higherIsBetter) higherIsBetter.disabled = false;
+    }
   }
 
   applyTypeUI();

@@ -541,12 +541,35 @@ def experiment_detail(experiment_id: str):
     resp = requests.get(f"{API_BASE_URL}/experiments/{experiment_id}", timeout=10)
     if resp.status_code != 200:
         return redirect(url_for("experiments_page"))
+    experiment = resp.json()
+
+    lightning_plugin = None
+    dataloaders_plugin = None
+    if experiment.get("experiment_type") == "custom_lightning":
+        lm_id = experiment.get("lightning_module_plugin_id")
+        dl_id = experiment.get("dataloaders_plugin_id")
+        if lm_id:
+            lm_resp = requests.get(f"{API_BASE_URL}/plugins/{lm_id}", timeout=10)
+            lm_resp.raise_for_status()
+            lightning_plugin = lm_resp.json()
+        if dl_id:
+            dl_resp = requests.get(f"{API_BASE_URL}/plugins/{dl_id}", timeout=10)
+            dl_resp.raise_for_status()
+            dataloaders_plugin = dl_resp.json()
+
     logs_resp = requests.get(f"{API_BASE_URL}/experiments/{experiment_id}/logs", timeout=10)
     logs_data = logs_resp.json() if logs_resp.status_code == 200 else {}
     logs = logs_data.get("logs", []) if isinstance(logs_data, dict) else logs_data
     benchmarks_resp = requests.get(f"{API_BASE_URL}/benchmarks", timeout=10)
     benchmarks = benchmarks_resp.json().get("benchmarks", []) if benchmarks_resp.status_code == 200 else []
-    return render_template("experiment_detail.html", experiment=resp.json(), logs=logs, benchmarks=benchmarks)
+    return render_template(
+        "experiment_detail.html",
+        experiment=experiment,
+        logs=logs,
+        benchmarks=benchmarks,
+        lightning_plugin=lightning_plugin,
+        dataloaders_plugin=dataloaders_plugin,
+    )
 
 
 @app.route("/experiments/<experiment_id>/copy")
@@ -654,6 +677,8 @@ def create_benchmark():
         "temperature": float(form.get("temperature", 0.7)),
         "top_p": float(form.get("top_p", 0.9)),
     }
+    if benchmark_type == "custom_lightning_plugin":
+        payload["higher_is_better"] = (form.get("higher_is_better") == "on")
     resp = requests.post(f"{API_BASE_URL}/benchmarks", json=payload, timeout=10)
     if resp.status_code == 200:
         return redirect(url_for("benchmarks_page"))
@@ -691,6 +716,8 @@ def edit_benchmark(benchmark_id: str):
         "temperature": float(form.get("temperature", 0.7)),
         "top_p": float(form.get("top_p", 0.9)),
     }
+    if form.get("benchmark_type") == "custom_lightning_plugin":
+        payload["higher_is_better"] = (form.get("higher_is_better") == "on")
     resp = requests.put(f"{API_BASE_URL}/benchmarks/{benchmark_id}", json=payload, timeout=10)
     if resp.status_code == 200:
         return redirect(url_for("benchmarks_page"))

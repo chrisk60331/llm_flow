@@ -16,13 +16,14 @@ def save_benchmark(benchmark: Benchmark) -> None:
         conn.execute(
             """
             INSERT OR REPLACE INTO benchmarks 
-            (id, name, benchmark_type, spec_json, question, gold_answer, max_new_tokens, temperature, top_p, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, name, benchmark_type, higher_is_better, spec_json, question, gold_answer, max_new_tokens, temperature, top_p, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 benchmark.id,
                 benchmark.name,
                 benchmark.benchmark_type.value,
+                1 if benchmark.higher_is_better else 0,
                 json.dumps(benchmark.spec),
                 benchmark.question,
                 benchmark.gold_answer,
@@ -52,6 +53,7 @@ def get_benchmark(benchmark_id: str) -> Benchmark | None:
             id=row["id"],
             name=row["name"],
             benchmark_type=benchmark_type,
+            higher_is_better=bool(row["higher_is_better"]),
             spec=spec,
             question=row["question"],
             gold_answer=row["gold_answer"],
@@ -80,6 +82,7 @@ def list_benchmarks() -> list[Benchmark]:
                     id=row["id"],
                     name=row["name"],
                     benchmark_type=benchmark_type,
+                    higher_is_better=bool(row["higher_is_better"]),
                     spec=spec,
                     question=row["question"],
                     gold_answer=row["gold_answer"],
@@ -107,14 +110,15 @@ def save_benchmark_eval(eval_result: BenchmarkEvalResult) -> None:
         conn.execute(
             """
             INSERT OR REPLACE INTO benchmark_evals
-            (id, benchmark_id, benchmark_name, benchmark_type, experiment_id, question, gold_answer, model_answer, bleu_score, rouge_score, primary_score, metrics_json, num_runs, run_scores_json, status, started_at, completed_at, error)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, benchmark_id, benchmark_name, benchmark_type, higher_is_better, experiment_id, question, gold_answer, model_answer, bleu_score, rouge_score, primary_score, metrics_json, num_runs, run_scores_json, status, started_at, completed_at, error)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 eval_result.id,
                 eval_result.benchmark_id,
                 eval_result.benchmark_name,
                 eval_result.benchmark_type.value,
+                1 if eval_result.higher_is_better else 0,
                 eval_result.experiment_id,
                 eval_result.question,
                 eval_result.gold_answer,
@@ -159,6 +163,7 @@ def get_benchmark_eval(eval_id: str) -> BenchmarkEvalResult | None:
             benchmark_id=row["benchmark_id"],
             benchmark_name=row["benchmark_name"],
             benchmark_type=benchmark_type,
+            higher_is_better=bool(row["higher_is_better"]),
             experiment_id=row["experiment_id"],
             question=row["question"],
             gold_answer=row["gold_answer"],
@@ -202,6 +207,7 @@ def list_benchmark_evals() -> list[BenchmarkEvalResult]:
                     benchmark_id=row["benchmark_id"],
                     benchmark_name=row["benchmark_name"],
                     benchmark_type=benchmark_type,
+                    higher_is_better=bool(row["higher_is_better"]),
                     experiment_id=row["experiment_id"],
                     question=row["question"],
                     gold_answer=row["gold_answer"],
@@ -250,6 +256,7 @@ def list_benchmark_evals_by_benchmark(benchmark_id: str) -> list[BenchmarkEvalRe
                     benchmark_id=row["benchmark_id"],
                     benchmark_name=row["benchmark_name"],
                     benchmark_type=benchmark_type,
+                    higher_is_better=bool(row["higher_is_better"]),
                     experiment_id=row["experiment_id"],
                     question=row["question"],
                     gold_answer=row["gold_answer"],

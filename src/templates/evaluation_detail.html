@@ -60,7 +60,7 @@
     </div>
     {% elif evaluation.benchmark_type == 'custom_lightning_plugin' %}
     <div class="metric-card mb-6 text-center py-8">
-        <p class="metric-label mb-2">Primary score</p>
+        <p class="metric-label mb-2">Primary score ({% if evaluation.higher_is_better %}higher is better{% else %}lower is better{% endif %})</p>
         <p class="text-5xl font-bold text-emerald-600">{{ "%.6f"|format(evaluation.primary_score) }}</p>
         <p class="text-sm text-gray-600 dark:text-gray-400 mt-2 font-mono">
             {{ (evaluation.metrics or {}) | tojson }}

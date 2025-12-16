@@ -157,7 +157,9 @@ def init_db() -> None:
     _migrate_benchmark_evals_add_rouge()
     _migrate_benchmarks_add_inference_settings()
     _migrate_benchmarks_add_type_and_spec()
+    _migrate_benchmarks_add_higher_is_better()
     _migrate_benchmark_evals_add_type_and_metrics()
+    _migrate_benchmark_evals_add_higher_is_better()
     _scan_existing_uploads()
     _scan_existing_plugins()
 
@@ -394,6 +396,30 @@ def _migrate_benchmark_evals_add_type_and_metrics() -> None:
         if "run_scores_json" not in columns:
             conn.execute(
                 "ALTER TABLE benchmark_evals ADD COLUMN run_scores_json TEXT NOT NULL DEFAULT '[]'"
+            )
+        conn.commit()
+
+
+def _migrate_benchmarks_add_higher_is_better() -> None:
+    """Add higher_is_better column to benchmarks if it doesn't exist."""
+    with get_connection() as conn:
+        cursor = conn.execute("PRAGMA table_info(benchmarks)")
+        columns = {row["name"] for row in cursor.fetchall()}
+        if "higher_is_better" not in columns:
+            conn.execute(
+                "ALTER TABLE benchmarks ADD COLUMN higher_is_better INTEGER NOT NULL DEFAULT 1"
+            )
+        conn.commit()
+
+
+def _migrate_benchmark_evals_add_higher_is_better() -> None:
+    """Add higher_is_better column to benchmark_evals if it doesn't exist."""
+    with get_connection() as conn:
+        cursor = conn.execute("PRAGMA table_info(benchmark_evals)")
+        columns = {row["name"] for row in cursor.fetchall()}
+        if "higher_is_better" not in columns:
+            conn.execute(
+                "ALTER TABLE benchmark_evals ADD COLUMN higher_is_better INTEGER NOT NULL DEFAULT 1"
             )
         conn.commit()
 

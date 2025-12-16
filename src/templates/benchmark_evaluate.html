@@ -164,6 +164,7 @@
 <script>
     const benchmarkId = "{{ benchmark.id }}";
     const benchmarkType = "{{ benchmark.benchmark_type }}";
+    const benchmarkHigherIsBetter = {{ 'true' if benchmark.higher_is_better else 'false' }};
     let evalPollingInterval = null;
     let currentEvalId = null;
     
@@ -299,7 +300,7 @@
             document.getElementById('secondary-value').textContent = 'mae=' + mae + ' rmse=' + rmse;
             document.getElementById('eval-result-noncausal').classList.remove('hidden');
         } else if (benchmarkType === 'custom_lightning_plugin') {
-            document.getElementById('primary-label').textContent = 'Primary score';
+            document.getElementById('primary-label').textContent = 'Primary score (' + (benchmarkHigherIsBetter ? 'higher is better' : 'lower is better') + ')';
             document.getElementById('primary-value').textContent = (data.primary_score || 0).toFixed(6);
             const m = (data.metrics && typeof data.metrics === 'object') ? data.metrics : {};
             const keys = Object.keys(m);

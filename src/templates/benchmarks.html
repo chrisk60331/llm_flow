@@ -115,6 +115,23 @@
                 </div>
             </div>
 
+            <div id="scoring_section" class="section-card hidden">
+                <div class="section-header">
+                    <h3 class="section-title">Scoring</h3>
+                </div>
+                <div class="section-body">
+                    <div class="form-group">
+                        <label class="inline-flex items-center gap-2">
+                            <input id="higher_is_better" name="higher_is_better" type="checkbox" class="form-checkbox" checked>
+                            <span class="text-sm text-gray-900 dark:text-gray-100">Higher is better</span>
+                        </label>
+                        <p class="text-xs text-gray-500 mt-1">
+                            Only applies to <span class="font-mono">custom_lightning_plugin</span> benchmarks (controls ranking for <span class="font-mono">primary_score</span>).
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <div id="inference_section" class="section-card">
                 <div class="section-header">
                     <h3 class="section-title">Inference Settings</h3>
@@ -158,6 +175,8 @@
   const pluginBuilder = document.getElementById('spec_plugin_builder');
   const inferenceSection = document.getElementById('inference_section');
   const questionHelp = document.getElementById('question_help');
+  const scoringSection = document.getElementById('scoring_section');
+  const higherIsBetter = document.getElementById('higher_is_better');
 
   const maxNewTokensInput = document.querySelector('input[name="max_new_tokens"]');
   const temperatureInput = document.querySelector('input[name="temperature"]');
@@ -213,6 +232,7 @@
     qaSection.classList.remove('hidden');
     sinBuilder.classList.add('hidden');
     pluginBuilder.classList.add('hidden');
+    scoringSection.classList.add('hidden');
     question.required = true;
     gold.required = true;
     questionHelp.textContent = '';
@@ -237,17 +257,20 @@
     if (maxNewTokensInput) maxNewTokensInput.disabled = true;
     if (temperatureInput) temperatureInput.disabled = true;
     if (topPInput) topPInput.disabled = true;
+    if (higherIsBetter) higherIsBetter.disabled = true;
 
     if (t === 'causal_lm_qa') {
       inferenceSection.classList.remove('hidden');
       if (maxNewTokensInput) maxNewTokensInput.disabled = false;
       if (temperatureInput) temperatureInput.disabled = false;
       if (topPInput) topPInput.disabled = false;
+      if (higherIsBetter) higherIsBetter.checked = true;
       question.placeholder = 'What is the capital of France?';
       return;
     }
     if (t === 'masked_lm_fill_mask') {
       inferenceSection.classList.add('hidden');
+      if (higherIsBetter) higherIsBetter.checked = true;
       question.placeholder = 'The capital of France is [MASK].';
       questionHelp.textContent = 'Include exactly one mask token: [MASK] (or <mask>)';
       return;
@@ -265,6 +288,7 @@
       if (sinXMin) sinXMin.disabled = false;
       if (sinXMax) sinXMax.disabled = false;
       if (sinNPoints) sinNPoints.disabled = false;
+      if (higherIsBetter) higherIsBetter.checked = false;
       setSpec(buildSinSpec());
       specHelp.textContent = 'Evaluates MSE against sin(x) on a fixed grid.';
       return;
@@ -279,6 +303,8 @@
     if (bmXMin) bmXMin.disabled = false;
     if (bmXMax) bmXMax.disabled = false;
     if (bmNPoints) bmNPoints.disabled = false;
+    scoringSection.classList.remove('hidden');
+    if (higherIsBetter) higherIsBetter.disabled = false;
     setSpec(buildPluginSpec());
     specHelp.textContent = 'Runs your uploaded benchmark plugin and stores primary_score + metrics.';
   }

@@ -51,9 +51,57 @@ from .helpers import now
 router = APIRouter(tags=["benchmarks"])
 
 
+def _apply_eval_ranks(evals: list[BenchmarkEvalResult]) -> list[BenchmarkEvalResult]:
+    """Compute per-benchmark ranks using primary_score and higher_is_better.
+
+    - Only completed evals are ranked.
+    - Ranks are 1..N within each benchmark_id.
+    """
+    by_benchmark: dict[str, list[BenchmarkEvalResult]] = {}
+    for ev in evals:
+        ev.rank = None
+        if ev.status != BenchmarkStatus.COMPLETED:
+            continue
+        by_benchmark.setdefault(ev.benchmark_id, []).append(ev)
+
+    for benchmark_id, items in by_benchmark.items():
+        hib_values = {bool(i.higher_is_better) for i in items}
+        if len(hib_values) != 1:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Inconsistent higher_is_better values for benchmark_id={benchmark_id}",
+            )
+        higher_is_better = hib_values.pop()
+        items.sort(key=lambda x: float(x.primary_score or 0.0), reverse=higher_is_better)
+        for idx, ev in enumerate(items, start=1):
+            ev.rank = idx
+    return evals
+
+
 @router.post("/benchmarks", response_model=Benchmark)
 def create_benchmark(request: BenchmarkCreateRequest) -> Benchmark:
     benchmark_id = str(uuid.uuid4())
+    # higher_is_better rules:
+    # - causal_lm_qa: always True (primary_score is ROUGE-L)
+    # - masked_lm_fill_mask: always True (primary_score is correctness)
+    # - custom_lightning_sin_regression: always False (primary_score is MSE)
+    # - custom_lightning_plugin: configurable (primary_score semantics are user-defined)
+    if request.benchmark_type in {BenchmarkType.CAUSAL_LM_QA, BenchmarkType.MASKED_LM_FILL_MASK}:
+        if request.higher_is_better is False:
+            raise HTTPException(status_code=400, detail="higher_is_better must be true for this benchmark_type")
+        higher_is_better = True
+    elif request.benchmark_type == BenchmarkType.CUSTOM_LIGHTNING_SIN_REGRESSION:
+        if request.higher_is_better is True:
+            raise HTTPException(
+                status_code=400,
+                detail="custom_lightning_sin_regression uses MSE; higher_is_better must be false",
+            )
+        higher_is_better = False
+    elif request.benchmark_type == BenchmarkType.CUSTOM_LIGHTNING_PLUGIN:
+        higher_is_better = True if request.higher_is_better is None else bool(request.higher_is_better)
+    else:
+        higher_is_better = True if request.higher_is_better is None else bool(request.higher_is_better)
+
     if request.benchmark_type == BenchmarkType.CAUSAL_LM_QA:
         if not request.question.strip() or not request.gold_answer.strip():
             raise HTTPException(status_code=400, detail="question and gold_answer are required for causal_lm_qa")
@@ -87,6 +135,7 @@ def create_benchmark(request: BenchmarkCreateRequest) -> Benchmark:
         id=benchmark_id,
         name=request.name,
         benchmark_type=request.benchmark_type,
+        higher_is_better=higher_is_better,
         spec=request.spec,
         question=request.question,
         gold_answer=request.gold_answer,
@@ -135,6 +184,20 @@ def update_benchmark(benchmark_id: str, request: BenchmarkUpdateRequest) -> Benc
         benchmark.temperature = request.temperature
     if request.top_p is not None:
         benchmark.top_p = request.top_p
+    if request.higher_is_better is not None:
+        if benchmark.benchmark_type == BenchmarkType.CUSTOM_LIGHTNING_PLUGIN:
+            benchmark.higher_is_better = bool(request.higher_is_better)
+        elif benchmark.benchmark_type == BenchmarkType.CUSTOM_LIGHTNING_SIN_REGRESSION:
+            if bool(request.higher_is_better) is True:
+                raise HTTPException(
+                    status_code=400,
+                    detail="custom_lightning_sin_regression uses MSE; higher_is_better must be false",
+                )
+            benchmark.higher_is_better = False
+        else:
+            if bool(request.higher_is_better) is False:
+                raise HTTPException(status_code=400, detail="higher_is_better must be true for this benchmark_type")
+            benchmark.higher_is_better = True
 
     if benchmark.benchmark_type == BenchmarkType.CAUSAL_LM_QA:
         if not benchmark.question.strip() or not benchmark.gold_answer.strip():
@@ -446,6 +509,7 @@ def start_benchmark_evaluation(benchmark_id: str, request: BenchmarkEvalRequest)
         benchmark_id=benchmark_id,
         benchmark_name=benchmark.name,
         benchmark_type=benchmark.benchmark_type,
+        higher_is_better=benchmark.higher_is_better,
         experiment_id=request.experiment_id,
         question=benchmark.question,
         gold_answer=benchmark.gold_answer,
@@ -475,18 +539,18 @@ def list_benchmark_evaluations(benchmark_id: str) -> BenchmarkEvalListResponse:
     benchmark = get_benchmark(benchmark_id)
     if not benchmark:
         raise HTTPException(status_code=404, detail="Benchmark not found")
-    return BenchmarkEvalListResponse(evaluations=list_benchmark_evals_by_benchmark(benchmark_id))
+    return BenchmarkEvalListResponse(evaluations=_apply_eval_ranks(list_benchmark_evals_by_benchmark(benchmark_id)))
 
 
 @router.get("/evaluations/by-benchmark/{benchmark_id}", response_model=BenchmarkEvalListResponse)
 def list_evaluations_by_benchmark(benchmark_id: str) -> BenchmarkEvalListResponse:
     """Legacy alias used by the Flask UI."""
-    return BenchmarkEvalListResponse(evaluations=list_benchmark_evals_by_benchmark(benchmark_id))
+    return BenchmarkEvalListResponse(evaluations=_apply_eval_ranks(list_benchmark_evals_by_benchmark(benchmark_id)))
 
 
 @router.get("/evaluations", response_model=BenchmarkEvalListResponse)
 def list_all_evaluations() -> BenchmarkEvalListResponse:
-    return BenchmarkEvalListResponse(evaluations=list_benchmark_evals())
+    return BenchmarkEvalListResponse(evaluations=_apply_eval_ranks(list_benchmark_evals()))
 
 
 @router.get("/evaluations/compare", response_model=EvaluationComparisonResponse)

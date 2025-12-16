@@ -97,6 +97,28 @@
                 <p class="font-mono text-sm text-gray-900 dark:text-gray-100">{{ experiment.output_dir }}</p>
             </div>
             {% endif %}
+
+            {% if experiment.experiment_type == 'custom_lightning' %}
+            <div class="col-span-2">
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Plugins</p>
+                <div class="text-sm text-gray-900 dark:text-gray-100 space-y-1">
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">LightningModule:</span>
+                        <span class="font-medium">{{ lightning_plugin.name }}</span>
+                        <span class="text-gray-500 dark:text-gray-400">({{ lightning_plugin.filename }})</span>
+                        <span class="text-gray-500 dark:text-gray-400">→</span>
+                        <span class="font-mono">{{ experiment.lightning_module_class_name }}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">Dataloaders:</span>
+                        <span class="font-medium">{{ dataloaders_plugin.name }}</span>
+                        <span class="text-gray-500 dark:text-gray-400">({{ dataloaders_plugin.filename }})</span>
+                        <span class="text-gray-500 dark:text-gray-400">→</span>
+                        <span class="font-mono">{{ experiment.dataloaders_function_name }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
         {% if experiment.error %}
         <div class="mt-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
