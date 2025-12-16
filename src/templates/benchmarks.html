@@ -291,14 +291,19 @@
                         </div>
                     </td>
                     <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400"><span data-utc="{{ bm.created_at }}" data-format="date">{{ bm.created_at[:10] if bm.created_at is string else bm.created_at }}</span></td>
-                    <td class="px-6 py-4 text-right">
-                        <div class="flex items-center justify-end gap-3">
-                            <a href="/benchmarks/{{ bm.id }}/edit" class="text-sm font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">Edit</a>
-                            <a href="/benchmarks/{{ bm.id }}/evaluate" class="text-sm font-medium text-primary-600 hover:text-primary-800">Evaluate</a>
-                            <a href="/benchmarks/{{ bm.id }}/results" class="text-sm font-medium text-emerald-600 hover:text-emerald-800">Results</a>
-                            <form action="/benchmarks/{{ bm.id }}/delete" method="post" class="inline" onsubmit="return confirm('Delete this benchmark?')">
-                                <button type="submit" class="text-sm font-medium text-red-500 hover:text-red-700">Delete</button>
-                            </form>
+                    <td class="px-4 py-4 text-right">
+                        <div class="relative inline-block">
+                            <button onclick="toggleDropdown(this)" class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="4" r="2"/><circle cx="10" cy="10" r="2"/><circle cx="10" cy="16" r="2"/></svg>
+                            </button>
+                            <div class="action-dropdown hidden absolute right-0 mt-1 w-28 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20">
+                                <a href="/benchmarks/{{ bm.id }}/edit" class="block px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Edit</a>
+                                <a href="/benchmarks/{{ bm.id }}/evaluate" class="block px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Evaluate</a>
+                                <a href="/benchmarks/{{ bm.id }}/results" class="block px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Results</a>
+                                <form action="/benchmarks/{{ bm.id }}/delete" method="post" onsubmit="return confirm('Delete this benchmark?')">
+                                    <button type="submit" class="w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700">Delete</button>
+                                </form>
+                            </div>
                         </div>
                     </td>
                 </tr>
@@ -328,6 +333,21 @@
 </div>
 
 <script>
+  // Dropdown toggle
+  function toggleDropdown(btn) {
+    const dropdown = btn.nextElementSibling;
+    const wasHidden = dropdown.classList.contains('hidden');
+    // Close all other dropdowns first
+    document.querySelectorAll('.action-dropdown').forEach(d => d.classList.add('hidden'));
+    if (wasHidden) dropdown.classList.remove('hidden');
+  }
+  // Close dropdowns when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.action-dropdown') && !e.target.closest('button[onclick*="toggleDropdown"]')) {
+      document.querySelectorAll('.action-dropdown').forEach(d => d.classList.add('hidden'));
+    }
+  });
+
   // Modal Functions
   function openModal() {
     document.getElementById('modal-backdrop').classList.remove('hidden');
