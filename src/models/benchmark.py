@@ -96,6 +96,7 @@ class BenchmarkEvalRequest(BaseModel):
     temperature: PositiveFloat = Field(default=0.7)
     top_p: PositiveFloat = Field(default=0.9)
     num_runs: PositiveInt = Field(default=1, description="Number of times to run evaluation and average scores")
+    compute_target_id: str | None = Field(default=None, description="Optional compute target for remote execution")
 
 
 class BenchmarkEvalStartResponse(BaseModel):

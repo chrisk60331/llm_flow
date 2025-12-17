@@ -78,6 +78,7 @@ class MaskedLMRequest(BaseModel):
     config_id: str | None = Field(default=None, description="ID of existing config to use")
     config: MaskedLMFullConfig | None = Field(default=None, description="Config to create (creates new config record)")
     config_name: str | None = Field(default=None, description="Optional name for new config")
+    compute_target_id: str | None = Field(default=None, description="Optional compute target for remote execution")
 
 
 # --- Causal LM Config Models ---
@@ -154,6 +155,7 @@ class CausalLMRequest(BaseModel):
     config_id: str | None = Field(default=None, description="ID of existing config to use")
     config: CausalLMFullConfig | None = Field(default=None, description="Config to create (creates new config record)")
     config_name: str | None = Field(default=None, description="Optional name for new config")
+    compute_target_id: str | None = Field(default=None, description="Optional compute target for remote execution")
 
 
 # --- Config Record Models (DB-stored configs) ---

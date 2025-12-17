@@ -41,7 +41,9 @@ from ..models import (
     MaskedLMRequest,
     PluginKind,
 )
+from ..remote_runner import run_experiment_remote
 from ..storage import (
+    get_compute_target,
     get_config,
     get_dataset,
     get_experiment,
@@ -367,24 +369,55 @@ def _run_custom_lightning_experiment(
         "cfg": request.config.cfg,
     }
 
+    payload = {
+        "experiment_id": experiment_id,
+        "output_dir": str(output_dir),
+        "config": cfg_payload,
+        "dataset": dataset_payload,
+        "lightning_module_path": lightning_plugin.path,
+        "lightning_module_class_name": request.lightning_module_class_name,
+        "dataloaders_path": dl_plugin.path,
+        "dataloaders_function_name": request.dataloaders_function_name,
+    }
+
+    # Check for remote execution
+    if request.compute_target_id:
+        compute_target = get_compute_target(request.compute_target_id)
+        if not compute_target:
+            exp.status = ExperimentStatus.FAILED
+            exp.error = "Compute target not found"
+            exp.completed_at = now()
+            save_experiment(exp)
+            return
+
+        try:
+            plugin_paths = [lightning_plugin.path, dl_plugin.path]
+            success, metrics, error = run_experiment_remote(
+                target=compute_target,
+                experiment_id=experiment_id,
+                payload=payload,
+                dataset_path=dataset_info.path,
+                plugin_paths=plugin_paths,
+            )
+
+            if success:
+                exp.status = ExperimentStatus.COMPLETED
+                exp.metrics = metrics
+            else:
+                exp.status = ExperimentStatus.FAILED
+                exp.error = error or "Remote execution failed"
+        except Exception as e:
+            exp.status = ExperimentStatus.FAILED
+            exp.error = str(e)
+        finally:
+            exp.completed_at = now()
+            save_experiment(exp)
+        return
+
+    # Local execution
     output_dir.mkdir(parents=True, exist_ok=True)
     payload_path = output_dir / "runner_payload.json"
-    payload_path.write_text(
-        json.dumps(
-            {
-                "experiment_id": experiment_id,
-                "output_dir": str(output_dir),
-                "config": cfg_payload,
-                "dataset": dataset_payload,
-                "lightning_module_path": lightning_plugin.path,
-                "lightning_module_class_name": request.lightning_module_class_name,
-                "dataloaders_path": dl_plugin.path,
-                "dataloaders_function_name": request.dataloaders_function_name,
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
+    payload_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     proc = subprocess.Popen(
         [sys.executable, "-m", "src.custom_lightning_runner", str(payload_path)],

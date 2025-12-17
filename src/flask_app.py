@@ -1004,6 +1004,77 @@ def meta_optimize_results(job_id: str):
 
 
 # ============================================================================
+# Compute Targets
+# ============================================================================
+
+@app.route("/compute")
+def compute_page():
+    targets = []
+    test_result = None
+    
+    try:
+        resp = requests.get(f"{API_BASE_URL}/compute/targets", timeout=10)
+        if resp.status_code == 200:
+            targets = resp.json().get("targets", [])
+    except Exception:
+        pass
+    
+    # Check for test result from redirect
+    if request.args.get("test_success") is not None:
+        test_result = {
+            "success": request.args.get("test_success") == "1",
+            "message": request.args.get("test_message", ""),
+            "python_version": request.args.get("test_python_version"),
+        }
+    
+    return render_template("compute.html", targets=targets, test_result=test_result)
+
+
+@app.route("/compute/new", methods=["POST"])
+def add_compute_target():
+    form = request.form.to_dict()
+    payload = {
+        "name": form.get("name", "").strip(),
+        "ssh_host": form.get("ssh_host", "").strip(),
+        "ssh_port": int(form.get("ssh_port", 22)),
+        "ssh_user": form.get("ssh_user", "").strip(),
+        "auth_type": form.get("auth_type", "key"),
+        "ssh_key_path": form.get("ssh_key_path", "").strip() or None,
+        "ssh_password": form.get("ssh_password", "") or None,
+        "remote_work_dir": form.get("remote_work_dir", "~/evalledger").strip(),
+    }
+    requests.post(f"{API_BASE_URL}/compute/targets", json=payload, timeout=10)
+    return redirect(url_for("compute_page"))
+
+
+@app.route("/compute/<target_id>/test", methods=["POST"])
+def test_compute_target(target_id: str):
+    try:
+        resp = requests.post(f"{API_BASE_URL}/compute/targets/{target_id}/test", timeout=30)
+        if resp.status_code == 200:
+            data = resp.json()
+            return redirect(url_for(
+                "compute_page",
+                test_success="1" if data.get("success") else "0",
+                test_message=data.get("message", ""),
+                test_python_version=data.get("python_version", ""),
+            ))
+    except Exception as e:
+        return redirect(url_for(
+            "compute_page",
+            test_success="0",
+            test_message=str(e),
+        ))
+    return redirect(url_for("compute_page"))
+
+
+@app.route("/compute/<target_id>/delete", methods=["POST"])
+def delete_compute_target(target_id: str):
+    requests.delete(f"{API_BASE_URL}/compute/targets/{target_id}", timeout=10)
+    return redirect(url_for("compute_page"))
+
+
+# ============================================================================
 # API Proxy Endpoints (for AJAX calls from frontend)
 # ============================================================================
 

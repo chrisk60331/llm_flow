@@ -102,3 +102,22 @@ __all__.extend(
     ]
 )
 
+from .compute_store import (
+    delete_compute_target,
+    get_compute_target,
+    list_compute_targets,
+    save_compute_target,
+    update_compute_target_status,
+)
+
+__all__.extend(
+    [
+        # Compute
+        "delete_compute_target",
+        "get_compute_target",
+        "list_compute_targets",
+        "save_compute_target",
+        "update_compute_target_status",
+    ]
+)
+

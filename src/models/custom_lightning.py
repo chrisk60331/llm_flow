@@ -29,4 +29,8 @@ class CustomLightningRequest(BaseModel):
     dataloaders_plugin_id: str
     dataloaders_function_name: str = Field(default="build_dataloaders")
 
+    compute_target_id: str | None = Field(
+        default=None, description="Optional compute target for remote execution"
+    )
+
 

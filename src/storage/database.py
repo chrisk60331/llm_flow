@@ -150,6 +150,22 @@ def init_db() -> None:
                 completed_at TEXT,
                 error TEXT
             );
+
+            CREATE TABLE IF NOT EXISTS compute_targets (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                ssh_host TEXT NOT NULL,
+                ssh_port INTEGER NOT NULL DEFAULT 22,
+                ssh_user TEXT NOT NULL,
+                auth_type TEXT NOT NULL,
+                ssh_key_path TEXT,
+                ssh_password TEXT,
+                remote_work_dir TEXT NOT NULL DEFAULT '~/evalledger',
+                created_at TEXT NOT NULL,
+                last_tested_at TEXT,
+                status TEXT NOT NULL DEFAULT 'unknown',
+                status_message TEXT
+            );
         """)
         conn.commit()
     _migrate_experiments_to_config_id()

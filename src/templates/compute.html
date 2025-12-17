@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}Compute Targets - EvalLedger{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Compute Targets</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage remote SSH servers for running experiments</p>
+        </div>
+        <button onclick="openAddModal()" class="btn-primary flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add Compute Target
+        </button>
+    </div>
+
+    <!-- Compute Targets List -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">SSH Targets</h2>
+        </div>
+        <div class="card-body">
+            {% if targets %}
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            <th class="pb-3 pr-4">Name</th>
+                            <th class="pb-3 pr-4">Host</th>
+                            <th class="pb-3 pr-4">User</th>
+                            <th class="pb-3 pr-4">Auth</th>
+                            <th class="pb-3 pr-4">Status</th>
+                            <th class="pb-3 pr-4">Last Tested</th>
+                            <th class="pb-3">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                        {% for target in targets %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                            <td class="py-3 pr-4">
+                                <span class="font-medium text-gray-900 dark:text-gray-100">{{ target.name }}</span>
+                            </td>
+                            <td class="py-3 pr-4">
+                                <span class="text-gray-600 dark:text-gray-300 font-mono text-sm">{{ target.ssh_host }}:{{ target.ssh_port }}</span>
+                            </td>
+                            <td class="py-3 pr-4">
+                                <span class="text-gray-600 dark:text-gray-300">{{ target.ssh_user }}</span>
+                            </td>
+                            <td class="py-3 pr-4">
+                                <span class="badge {% if target.auth_type == 'key' %}badge-blue{% else %}badge-purple{% endif %}">
+                                    {{ target.auth_type }}
+                                </span>
+                            </td>
+                            <td class="py-3 pr-4">
+                                {% if target.status == 'connected' %}
+                                <span class="badge badge-green">Connected</span>
+                                {% elif target.status == 'failed' %}
+                                <span class="badge badge-red" title="{{ target.status_message or '' }}">Failed</span>
+                                {% else %}
+                                <span class="badge badge-gray">Unknown</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 pr-4">
+                                {% if target.last_tested_at %}
+                                <span class="text-sm text-gray-500 dark:text-gray-400" data-utc="{{ target.last_tested_at }}">
+                                    {{ target.last_tested_at }}
+                                </span>
+                                {% else %}
+                                <span class="text-sm text-gray-400 dark:text-gray-500">Never</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3">
+                                <div class="flex items-center gap-2">
+                                    <form action="{{ url_for('test_compute_target', target_id=target.id) }}" method="POST" class="inline">
+                                        <button type="submit" class="text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 text-sm font-medium">
+                                            Test
+                                        </button>
+                                    </form>
+                                    <form action="{{ url_for('delete_compute_target', target_id=target.id) }}" method="POST" class="inline" onsubmit="return confirm('Delete this compute target?')">
+                                        <button type="submit" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                </svg>
+                <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-gray-100">No compute targets</h3>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Add a remote SSH server to run experiments on external hardware.</p>
+                <button onclick="openAddModal()" class="btn-primary mt-4">Add Compute Target</button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Info Card -->
+    <div class="card">
+        <div class="card-body">
+            <div class="flex gap-4">
+                <div class="flex-shrink-0">
+                    <svg class="w-6 h-6 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="font-medium text-gray-900 dark:text-gray-100">How it works</h3>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                        Compute targets let you run experiments on remote servers via SSH. When you select a compute target for an experiment:
+                    </p>
+                    <ol class="mt-2 text-sm text-gray-600 dark:text-gray-400 list-decimal list-inside space-y-1">
+                        <li>EvalLedger connects to your server and copies the necessary code and plugins</li>
+                        <li>Your dataset is uploaded to the remote server</li>
+                        <li>The experiment runs on the remote hardware</li>
+                        <li>Artifacts are retrieved back to your local machine</li>
+                    </ol>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-500">
+                        <strong>Requirement:</strong> The remote server must have Python 3.10+ and the same dependencies installed.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Compute Target Modal -->
+<div id="addModal" class="fixed inset-0 z-50 hidden">
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" onclick="closeAddModal()"></div>
+    <div class="fixed inset-0 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg relative">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Add Compute Target</h3>
+            </div>
+            <form action="{{ url_for('add_compute_target') }}" method="POST" class="p-6 space-y-4">
+                <div class="form-group">
+                    <label class="form-label">Name</label>
+                    <input type="text" name="name" required placeholder="My GPU Server" class="form-input">
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="col-span-2 form-group">
+                        <label class="form-label">SSH Host</label>
+                        <input type="text" name="ssh_host" required placeholder="gpu.example.com" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Port</label>
+                        <input type="number" name="ssh_port" value="22" required class="form-input">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">SSH User</label>
+                    <input type="text" name="ssh_user" required placeholder="ubuntu" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Authentication Type</label>
+                    <select name="auth_type" id="authType" onchange="toggleAuthFields()" class="form-select">
+                        <option value="key">SSH Key</option>
+                        <option value="password">Password</option>
+                    </select>
+                </div>
+                <div id="keyAuthFields" class="form-group">
+                    <label class="form-label">SSH Key Path</label>
+                    <input type="text" name="ssh_key_path" placeholder="~/.ssh/id_rsa" class="form-input">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Path to your private key file on this machine</p>
+                </div>
+                <div id="passwordAuthFields" class="form-group hidden">
+                    <label class="form-label">SSH Password</label>
+                    <input type="password" name="ssh_password" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Remote Work Directory</label>
+                    <input type="text" name="remote_work_dir" value="~/evalledger" class="form-input">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Where to store code and artifacts on the remote server</p>
+                </div>
+                <div class="flex justify-end gap-3 pt-4">
+                    <button type="button" onclick="closeAddModal()" class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn-primary">Add Target</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% if test_result %}
+<!-- Test Result Toast -->
+<div id="testToast" class="fixed bottom-4 right-4 z-50 max-w-sm">
+    <div class="{% if test_result.success %}bg-emerald-50 dark:bg-emerald-900/50 border-emerald-200 dark:border-emerald-800{% else %}bg-red-50 dark:bg-red-900/50 border-red-200 dark:border-red-800{% endif %} border rounded-lg shadow-lg p-4">
+        <div class="flex items-start gap-3">
+            {% if test_result.success %}
+            <svg class="w-5 h-5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            {% else %}
+            <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            {% endif %}
+            <div>
+                <p class="font-medium {% if test_result.success %}text-emerald-800 dark:text-emerald-200{% else %}text-red-800 dark:text-red-200{% endif %}">
+                    {{ test_result.message }}
+                </p>
+                {% if test_result.python_version %}
+                <p class="text-sm text-emerald-600 dark:text-emerald-400 mt-1">{{ test_result.python_version }}</p>
+                {% endif %}
+            </div>
+            <button onclick="document.getElementById('testToast').remove()" class="ml-auto text-gray-400 hover:text-gray-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openAddModal() {
+    document.getElementById('addModal').classList.remove('hidden');
+}
+
+function closeAddModal() {
+    document.getElementById('addModal').classList.add('hidden');
+}
+
+function toggleAuthFields() {
+    const authType = document.getElementById('authType').value;
+    const keyFields = document.getElementById('keyAuthFields');
+    const passwordFields = document.getElementById('passwordAuthFields');
+    
+    if (authType === 'key') {
+        keyFields.classList.remove('hidden');
+        passwordFields.classList.add('hidden');
+    } else {
+        keyFields.classList.add('hidden');
+        passwordFields.classList.remove('hidden');
+    }
+}
+
+// Auto-hide toast after 5 seconds
+const toast = document.getElementById('testToast');
+if (toast) {
+    setTimeout(() => toast.remove(), 5000);
+}
+
+// Close modal on escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeAddModal();
+});
+</script>
+{% endblock %}
+

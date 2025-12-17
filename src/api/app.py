@@ -103,6 +103,7 @@ from .benchmark_routes import router as benchmark_router
 from .meta_routes import router as meta_router
 from .autotune_routes import router as autotune_router
 from .plugin_routes import router as plugin_router
+from .compute_routes import router as compute_router
 
 app.include_router(config_router)
 app.include_router(dataset_router)
@@ -111,4 +112,5 @@ app.include_router(benchmark_router)
 app.include_router(meta_router)
 app.include_router(autotune_router)
 app.include_router(plugin_router)
+app.include_router(compute_router)
 

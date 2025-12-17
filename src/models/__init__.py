@@ -51,6 +51,12 @@ from .experiment import (
     ExperimentStartResponse,
 )
 from .plugins import PluginKind, PluginListResponse, PluginRecord, PluginUploadResponse
+from .compute import (
+    ComputeTarget,
+    ComputeTargetCreate,
+    ComputeTargetListResponse,
+    ComputeTargetTestResponse,
+)
 from .custom_lightning import (
     CustomLightningFullConfig,
     CustomLightningRequest,
@@ -64,6 +70,11 @@ __all__ = [
     "BenchmarkType",
     "ExperimentStatus",
     "ExperimentType",
+    # Compute
+    "ComputeTarget",
+    "ComputeTargetCreate",
+    "ComputeTargetListResponse",
+    "ComputeTargetTestResponse",
     # Dataset
     "DatasetInfo",
     "DatasetListResponse",
