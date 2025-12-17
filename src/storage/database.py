@@ -170,6 +170,7 @@ def init_db() -> None:
         conn.commit()
     _migrate_experiments_to_config_id()
     _migrate_experiments_add_custom_lightning_fields()
+    _migrate_experiments_add_compute_target()
     _migrate_benchmark_evals_add_rouge()
     _migrate_benchmarks_add_inference_settings()
     _migrate_benchmarks_add_type_and_spec()
@@ -198,7 +199,94 @@ def _migrate_experiments_add_custom_lightning_fields() -> None:
         conn.commit()
 
 
+def _migrate_experiments_add_compute_target() -> None:
+    """Add compute target columns to experiments table if missing."""
+    with get_connection() as conn:
+        cursor = conn.execute("PRAGMA table_info(experiments)")
+        columns = {row["name"] for row in cursor.fetchall()}
+
+        if "compute_target_id" not in columns:
+            conn.execute("ALTER TABLE experiments ADD COLUMN compute_target_id TEXT")
+        if "compute_target_name" not in columns:
+            conn.execute("ALTER TABLE experiments ADD COLUMN compute_target_name TEXT")
+        if "logs" not in columns:
+            conn.execute("ALTER TABLE experiments ADD COLUMN logs TEXT")
+        conn.commit()
+
+
 def _migrate_experiments_to_config_id() -> None:
+    """Migrate old experiments table to use config_id reference."""
+    with get_connection() as conn:
+        cursor = conn.execute("PRAGMA table_info(experiments)")
+        columns = {row["name"] for row in cursor.fetchall()}
+        
+        if "config" not in columns:
+            return
+        
+        rows = conn.execute("SELECT * FROM experiments").fetchall()
+        
+        conn.execute("DROP TABLE experiments")
+        conn.execute("""
+            CREATE TABLE experiments (
+                id TEXT PRIMARY KEY,
+                experiment_type TEXT NOT NULL,
+                status TEXT NOT NULL,
+                dataset_id TEXT NOT NULL,
+                dataset_filename TEXT,
+                config_id TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                completed_at TEXT,
+                metrics TEXT,
+                output_dir TEXT,
+                error TEXT,
+                FOREIGN KEY (config_id) REFERENCES configs(id)
+            )
+        """)
+        
+        for row in rows:
+            exp_id = row["id"]
+            exp_type = ExperimentType(row["experiment_type"])
+            config_json = row["config"]
+            
+            if not config_json:
+                continue
+            
+            config_id = str(uuid.uuid4())
+            config_name = f"migrated_{exp_id[:8]}"
+            
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO configs (id, name, experiment_type, config_json, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (config_id, config_name, exp_type.value, config_json, row["started_at"]),
+            )
+            
+            conn.execute(
+                """
+                INSERT INTO experiments 
+                (id, experiment_type, status, dataset_id, dataset_filename, config_id, started_at, completed_at, metrics, output_dir, error)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    exp_id,
+                    row["experiment_type"],
+                    row["status"],
+                    row["dataset_id"],
+                    row.get("dataset_filename"),
+                    config_id,
+                    row["started_at"],
+                    row.get("completed_at"),
+                    row.get("metrics"),
+                    row.get("output_dir"),
+                    row.get("error"),
+                ),
+            )
+        
+        conn.commit()
+
+
+def _migrate_experiments_to_config_id_stage2() -> None:
     """Migrate old experiments with embedded config to new config_id schema."""
     with get_connection() as conn:
         # Check current schema

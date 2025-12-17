@@ -50,6 +50,7 @@ class AutoTuneRequest(BaseModel):
     answer_field: str = "answer"
     top_k: int = Field(default=5, ge=1, le=10)
     probe_steps: int = Field(default=5, ge=1, le=50)
+    compute_target_id: str | None = Field(default=None, description="Optional compute target for remote execution")
 
 
 class AutoTuneStartResponse(BaseModel):

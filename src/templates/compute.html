@@ -55,8 +55,10 @@
                                 </span>
                             </td>
                             <td class="py-3 pr-4">
-                                {% if target.status == 'connected' %}
-                                <span class="badge badge-green">Connected</span>
+                                {% if target.status == 'provisioned' %}
+                                <span class="badge badge-green">Provisioned</span>
+                                {% elif target.status == 'connected' %}
+                                <span class="badge badge-blue">Connected</span>
                                 {% elif target.status == 'failed' %}
                                 <span class="badge badge-red" title="{{ target.status_message or '' }}">Failed</span>
                                 {% else %}
@@ -79,6 +81,9 @@
                                             Test
                                         </button>
                                     </form>
+                                    <button type="button" onclick="provisionTarget('{{ target.id }}', '{{ target.name }}')" class="text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 text-sm font-medium">
+                                        Provision
+                                    </button>
                                     <form action="{{ url_for('delete_compute_target', target_id=target.id) }}" method="POST" class="inline" onsubmit="return confirm('Delete this compute target?')">
                                         <button type="submit" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium">
                                             Delete
@@ -116,16 +121,28 @@
                 <div>
                     <h3 class="font-medium text-gray-900 dark:text-gray-100">How it works</h3>
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Compute targets let you run experiments on remote servers via SSH. When you select a compute target for an experiment:
+                        Compute targets let you run experiments on remote servers via SSH.
                     </p>
-                    <ol class="mt-2 text-sm text-gray-600 dark:text-gray-400 list-decimal list-inside space-y-1">
-                        <li>EvalLedger connects to your server and copies the necessary code and plugins</li>
-                        <li>Your dataset is uploaded to the remote server</li>
-                        <li>The experiment runs on the remote hardware</li>
-                        <li>Artifacts are retrieved back to your local machine</li>
-                    </ol>
-                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-500">
-                        <strong>Requirement:</strong> The remote server must have Python 3.10+ and the same dependencies installed.
+                    <div class="mt-3 space-y-3">
+                        <div>
+                            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Getting Started:</p>
+                            <ol class="mt-1 text-sm text-gray-600 dark:text-gray-400 list-decimal list-inside space-y-1">
+                                <li><strong>Test</strong> - Verify SSH connection to your server</li>
+                                <li><strong>Provision</strong> - Install uv, create venv, sync dependencies and code</li>
+                                <li>Select the target when creating experiments or benchmarks</li>
+                            </ol>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">When running an experiment:</p>
+                            <ol class="mt-1 text-sm text-gray-600 dark:text-gray-400 list-decimal list-inside space-y-1">
+                                <li>Dataset is uploaded to the remote server</li>
+                                <li>Experiment runs using the provisioned environment</li>
+                                <li>Artifacts are retrieved back to your local machine</li>
+                            </ol>
+                        </div>
+                    </div>
+                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-500">
+                        <strong>Requirement:</strong> The remote server must have Python 3.9+ and curl installed.
                     </p>
                 </div>
             </div>
@@ -188,6 +205,57 @@
                     <button type="submit" class="btn-primary">Add Target</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Provision Modal -->
+<div id="provisionModal" class="fixed inset-0 z-50 hidden">
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm"></div>
+    <div class="fixed inset-0 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg relative">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    <span id="provisionTitle">Provision Compute Target</span>
+                </h3>
+            </div>
+            <div class="p-6">
+                <div id="provisionProgress" class="space-y-4">
+                    <div class="flex items-center gap-3">
+                        <div id="provisionSpinner" class="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-500"></div>
+                        <p id="provisionStatus" class="text-gray-700 dark:text-gray-300">Starting provisioning...</p>
+                    </div>
+                    <div id="provisionLogs" class="bg-gray-900 dark:bg-gray-950 rounded-lg p-4 max-h-64 overflow-y-auto font-mono text-xs text-green-400">
+                    </div>
+                </div>
+                <div id="provisionResult" class="hidden space-y-4">
+                    <div id="provisionSuccess" class="hidden">
+                        <div class="flex items-center gap-3 text-emerald-600 dark:text-emerald-400">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <p class="font-medium">Environment provisioned successfully!</p>
+                        </div>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                            The remote server now has uv, dependencies, and code synced. You can run experiments on this target.
+                        </p>
+                    </div>
+                    <div id="provisionError" class="hidden">
+                        <div class="flex items-center gap-3 text-red-600 dark:text-red-400">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <p class="font-medium">Provisioning failed</p>
+                        </div>
+                        <p id="provisionErrorMsg" class="text-sm text-red-600 dark:text-red-400 mt-2 bg-red-50 dark:bg-red-900/30 p-3 rounded"></p>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" onclick="closeProvisionModal()" id="provisionCloseBtn" class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors hidden">
+                        Close
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -259,6 +327,85 @@ if (toast) {
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeAddModal();
 });
+
+// Provision functions
+function provisionTarget(targetId, targetName) {
+    document.getElementById('provisionTitle').textContent = `Provisioning: ${targetName}`;
+    document.getElementById('provisionProgress').classList.remove('hidden');
+    document.getElementById('provisionResult').classList.add('hidden');
+    document.getElementById('provisionSuccess').classList.add('hidden');
+    document.getElementById('provisionError').classList.add('hidden');
+    document.getElementById('provisionCloseBtn').classList.add('hidden');
+    document.getElementById('provisionSpinner').classList.remove('hidden');
+    document.getElementById('provisionStatus').textContent = 'Starting provisioning...';
+    document.getElementById('provisionLogs').innerHTML = '';
+    document.getElementById('provisionModal').classList.remove('hidden');
+    
+    // Start provisioning
+    fetch(`/api/compute/targets/${targetId}/provision`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json().then(data => ({ ok: response.ok, data })))
+    .then(({ ok, data }) => {
+        document.getElementById('provisionSpinner').classList.add('hidden');
+        document.getElementById('provisionProgress').classList.add('hidden');
+        document.getElementById('provisionResult').classList.remove('hidden');
+        document.getElementById('provisionCloseBtn').classList.remove('hidden');
+        
+        if (ok && data.success) {
+            document.getElementById('provisionSuccess').classList.remove('hidden');
+            // Update logs
+            if (data.logs && data.logs.length > 0) {
+                const logsHtml = data.logs.map(log => `<div>${log}</div>`).join('');
+                document.getElementById('provisionLogs').innerHTML = logsHtml;
+                document.getElementById('provisionProgress').classList.remove('hidden');
+            }
+            // Reload page to show updated status
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            document.getElementById('provisionError').classList.remove('hidden');
+            document.getElementById('provisionErrorMsg').textContent = data.detail || data.message || 'Unknown error';
+        }
+    })
+    .catch(error => {
+        document.getElementById('provisionSpinner').classList.add('hidden');
+        document.getElementById('provisionProgress').classList.add('hidden');
+        document.getElementById('provisionResult').classList.remove('hidden');
+        document.getElementById('provisionError').classList.remove('hidden');
+        document.getElementById('provisionCloseBtn').classList.remove('hidden');
+        document.getElementById('provisionErrorMsg').textContent = error.message || 'Connection failed';
+    });
+    
+    // Simulate log updates while waiting
+    let logCount = 0;
+    const logMessages = [
+        'Connecting to server...',
+        'Checking for uv installation...',
+        'Syncing project files...',
+        'Creating virtual environment...',
+        'Installing dependencies...',
+    ];
+    const logInterval = setInterval(() => {
+        if (logCount < logMessages.length) {
+            const logsEl = document.getElementById('provisionLogs');
+            logsEl.innerHTML += `<div class="text-gray-400">$ ${logMessages[logCount]}</div>`;
+            logsEl.scrollTop = logsEl.scrollHeight;
+            document.getElementById('provisionStatus').textContent = logMessages[logCount];
+            logCount++;
+        }
+    }, 2000);
+    
+    // Clear interval when modal closes
+    document.getElementById('provisionModal').dataset.logInterval = logInterval;
+}
+
+function closeProvisionModal() {
+    const modal = document.getElementById('provisionModal');
+    const interval = modal.dataset.logInterval;
+    if (interval) clearInterval(parseInt(interval));
+    modal.classList.add('hidden');
+}
 </script>
 {% endblock %}
 

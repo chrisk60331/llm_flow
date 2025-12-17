@@ -15,8 +15,9 @@ def save_experiment(exp: ExperimentResult) -> None:
             """
             INSERT OR REPLACE INTO experiments
             (id, experiment_type, status, dataset_id, dataset_filename, config_id, started_at, completed_at, metrics, output_dir, error,
-             lightning_module_plugin_id, lightning_module_class_name, dataloaders_plugin_id, dataloaders_function_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             lightning_module_plugin_id, lightning_module_class_name, dataloaders_plugin_id, dataloaders_function_name,
+             compute_target_id, compute_target_name, logs)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 exp.id,
@@ -34,6 +35,9 @@ def save_experiment(exp: ExperimentResult) -> None:
                 exp.lightning_module_class_name,
                 exp.dataloaders_plugin_id,
                 exp.dataloaders_function_name,
+                exp.compute_target_id,
+                exp.compute_target_name,
+                exp.logs,
             ),
         )
         conn.commit()
@@ -67,6 +71,9 @@ def get_experiment(experiment_id: str) -> ExperimentResult | None:
             lightning_module_class_name=row["lightning_module_class_name"],
             dataloaders_plugin_id=row["dataloaders_plugin_id"],
             dataloaders_function_name=row["dataloaders_function_name"],
+            compute_target_id=row["compute_target_id"] if "compute_target_id" in row.keys() else None,
+            compute_target_name=row["compute_target_name"] if "compute_target_name" in row.keys() else None,
+            logs=row["logs"] if "logs" in row.keys() else None,
         )
 
 
@@ -103,6 +110,9 @@ def list_experiments() -> list[ExperimentResult]:
                     lightning_module_class_name=row["lightning_module_class_name"],
                     dataloaders_plugin_id=row["dataloaders_plugin_id"],
                     dataloaders_function_name=row["dataloaders_function_name"],
+                    compute_target_id=row["compute_target_id"] if "compute_target_id" in row.keys() else None,
+                    compute_target_name=row["compute_target_name"] if "compute_target_name" in row.keys() else None,
+                    logs=row["logs"] if "logs" in row.keys() else None,
                 )
             )
         return results

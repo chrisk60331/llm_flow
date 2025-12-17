@@ -78,7 +78,10 @@ def index():
     except Exception:
         pass
     
-    return render_template("home.html", stats=stats, datasets=datasets, configs=configs, benchmarks=benchmarks)
+    compute_resp = requests.get(f"{API_BASE_URL}/compute/targets", timeout=10)
+    compute_targets = compute_resp.json().get("targets", []) if compute_resp.status_code == 200 else []
+    
+    return render_template("home.html", stats=stats, datasets=datasets, configs=configs, benchmarks=benchmarks, compute_targets=compute_targets)
 
 
 # ============================================================================
@@ -308,7 +311,9 @@ def new_masked_lm_experiment():
         return redirect(url_for("datasets_page"))
     configs_resp = requests.get(f"{API_BASE_URL}/configs/by-type/masked_lm", timeout=10)
     configs = configs_resp.json().get("configs", []) if configs_resp.status_code == 200 else []
-    return render_template("new_masked_lm.html", dataset=resp.json(), configs=configs)
+    compute_resp = requests.get(f"{API_BASE_URL}/compute/targets", timeout=10)
+    compute_targets = compute_resp.json().get("targets", []) if compute_resp.status_code == 200 else []
+    return render_template("new_masked_lm.html", dataset=resp.json(), configs=configs, compute_targets=compute_targets)
 
 
 @app.route("/experiments/new/causal-lm")
@@ -321,7 +326,9 @@ def new_causal_lm_experiment():
         return redirect(url_for("datasets_page"))
     configs_resp = requests.get(f"{API_BASE_URL}/configs/by-type/causal_lm", timeout=10)
     configs = configs_resp.json().get("configs", []) if configs_resp.status_code == 200 else []
-    return render_template("new_causal_lm.html", dataset=resp.json(), configs=configs)
+    compute_resp = requests.get(f"{API_BASE_URL}/compute/targets", timeout=10)
+    compute_targets = compute_resp.json().get("targets", []) if compute_resp.status_code == 200 else []
+    return render_template("new_causal_lm.html", dataset=resp.json(), configs=configs, compute_targets=compute_targets)
 
 
 @app.route("/experiments/new/custom-lightning")
@@ -345,12 +352,16 @@ def new_custom_lightning_experiment():
         for p in lightning_plugins
     }
 
+    compute_resp = requests.get(f"{API_BASE_URL}/compute/targets", timeout=10)
+    compute_targets = compute_resp.json().get("targets", []) if compute_resp.status_code == 200 else []
+
     return render_template(
         "new_custom_lightning.html",
         dataset=ds_resp.json(),
         lightning_plugins=lightning_plugins,
         dataloader_plugins=dataloader_plugins,
         lightning_plugin_classes=lightning_plugin_classes,
+        compute_targets=compute_targets,
         error=None,
     )
 
@@ -359,12 +370,15 @@ def new_custom_lightning_experiment():
 def start_masked_lm():
     form = request.form.to_dict()
     config_id = form.get("config_id")
+    compute_target_id = form.get("compute_target_id") or None
     
     if config_id:
         payload = {
             "dataset_id": form.get("dataset_id"),
             "config_id": config_id,
         }
+        if compute_target_id:
+            payload["compute_target_id"] = compute_target_id
     else:
         text_fields = [f.strip() for f in form.pop("text_fields", "").split(",") if f.strip()]
         payload = {
@@ -402,6 +416,8 @@ def start_masked_lm():
                 },
             },
         }
+        if compute_target_id:
+            payload["compute_target_id"] = compute_target_id
     resp = requests.post(f"{API_BASE_URL}/experiments/masked-lm", json=payload, timeout=10)
     if resp.status_code == 200:
         experiment_id = resp.json().get("experiment_id")
@@ -414,12 +430,15 @@ def start_masked_lm():
 def start_causal_lm():
     form = request.form.to_dict()
     config_id = form.get("config_id")
+    compute_target_id = form.get("compute_target_id") or None
     
     if config_id:
         payload = {
             "dataset_id": form.get("dataset_id"),
             "config_id": config_id,
         }
+        if compute_target_id:
+            payload["compute_target_id"] = compute_target_id
     else:
         target_modules = [m.strip() for m in form.get("peft_target_modules", "").split(",") if m.strip()]
         payload = {
@@ -472,6 +491,8 @@ def start_causal_lm():
                 },
             },
         }
+        if compute_target_id:
+            payload["compute_target_id"] = compute_target_id
     resp = requests.post(f"{API_BASE_URL}/experiments/causal-lm", json=payload, timeout=10)
     if resp.status_code == 200:
         experiment_id = resp.json().get("experiment_id")
@@ -526,6 +547,8 @@ def start_custom_lightning():
         "dataloaders_plugin_id": form.get("dataloaders_plugin_id"),
         "dataloaders_function_name": "build_dataloaders",
     }
+    if form.get("compute_target_id"):
+        payload["compute_target_id"] = form.get("compute_target_id")
 
     resp = requests.post(f"{API_BASE_URL}/experiments/custom-lightning", json=payload, timeout=10)
     if resp.status_code == 200:
@@ -590,6 +613,9 @@ def copy_experiment(experiment_id: str):
         for p in lightning_plugins
     }
 
+    compute_resp = requests.get(f"{API_BASE_URL}/compute/targets", timeout=10)
+    compute_targets = compute_resp.json().get("targets", []) if compute_resp.status_code == 200 else []
+
     return render_template(
         "copy_experiment.html",
         experiment=experiment,
@@ -597,6 +623,7 @@ def copy_experiment(experiment_id: str):
         lightning_plugins=lightning_plugins,
         dataloader_plugins=dataloader_plugins,
         lightning_plugin_classes=lightning_plugin_classes,
+        compute_targets=compute_targets,
     )
 
 
@@ -606,10 +633,110 @@ def delete_experiment(experiment_id: str):
     return redirect(url_for("experiments_page"))
 
 
+@app.route("/experiments/<experiment_id>/restart", methods=["POST"])
+def restart_experiment(experiment_id: str):
+    """Copy an experiment and immediately run it with the same configuration."""
+    # Get the original experiment
+    resp = requests.get(f"{API_BASE_URL}/experiments/{experiment_id}", timeout=10)
+    if resp.status_code != 200:
+        return redirect(url_for("experiment_detail", experiment_id=experiment_id))
+    
+    experiment = resp.json()
+    exp_type = experiment.get("experiment_type")
+    
+    # Build the request payload based on experiment type
+    payload = {
+        "dataset_id": experiment.get("dataset_id"),
+        "config_id": experiment.get("config_id"),
+        "compute_target_id": experiment.get("compute_target_id"),
+    }
+    
+    # Add custom lightning specific fields
+    if exp_type == "custom_lightning":
+        payload["lightning_module_plugin_id"] = experiment.get("lightning_module_plugin_id")
+        payload["lightning_module_class_name"] = experiment.get("lightning_module_class_name")
+        payload["dataloaders_plugin_id"] = experiment.get("dataloaders_plugin_id")
+        payload["dataloaders_function_name"] = experiment.get("dataloaders_function_name") or "build_dataloaders"
+    
+    # Determine the endpoint based on experiment type
+    if exp_type == "causal_lm":
+        endpoint = f"{API_BASE_URL}/experiments/causal-lm"
+    elif exp_type == "masked_lm":
+        endpoint = f"{API_BASE_URL}/experiments/masked-lm"
+    elif exp_type == "custom_lightning":
+        endpoint = f"{API_BASE_URL}/experiments/custom-lightning"
+    else:
+        return redirect(url_for("experiment_detail", experiment_id=experiment_id))
+    
+    # Start the new experiment
+    resp = requests.post(endpoint, json=payload, timeout=30)
+    if resp.status_code == 200:
+        new_exp = resp.json()
+        new_exp_id = new_exp.get("experiment_id")
+        if new_exp_id:
+            return redirect(url_for("experiment_detail", experiment_id=new_exp_id))
+    
+    return redirect(url_for("experiment_detail", experiment_id=experiment_id))
+
+
 @app.route("/experiments/<experiment_id>/stop", methods=["POST"])
 def stop_experiment(experiment_id: str):
     requests.post(f"{API_BASE_URL}/experiments/{experiment_id}/stop", timeout=10)
     return redirect(url_for("experiment_detail", experiment_id=experiment_id))
+
+
+@app.route("/experiments/<experiment_id>/download")
+def download_experiment_artifacts(experiment_id: str):
+    """Download experiment artifacts as a zip file."""
+    import io
+    import zipfile
+    from pathlib import Path
+    
+    # Get experiment to determine the artifact path
+    resp = requests.get(f"{API_BASE_URL}/experiments/{experiment_id}", timeout=10)
+    if resp.status_code != 200:
+        return redirect(url_for("experiment_detail", experiment_id=experiment_id))
+    
+    experiment = resp.json()
+    output_dir = experiment.get("output_dir")
+    
+    if not output_dir:
+        # Try to construct the path based on experiment type
+        exp_type = experiment.get("experiment_type")
+        artifacts_base = Path(__file__).parent.parent / "artifacts"
+        if exp_type == "causal_lm":
+            output_dir = artifacts_base / f"causal_lm_{experiment_id}"
+        elif exp_type == "masked_lm":
+            output_dir = artifacts_base / f"masked_lm_{experiment_id}"
+        elif exp_type == "custom_lightning":
+            output_dir = artifacts_base / f"custom_lightning_{experiment_id}"
+        else:
+            output_dir = artifacts_base / experiment_id
+    else:
+        output_dir = Path(output_dir)
+    
+    if not output_dir.exists():
+        from flask import flash
+        flash("Artifacts not found", "error")
+        return redirect(url_for("experiment_detail", experiment_id=experiment_id))
+    
+    # Create zip file in memory
+    memory_file = io.BytesIO()
+    with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for file_path in output_dir.rglob('*'):
+            if file_path.is_file():
+                arcname = file_path.relative_to(output_dir)
+                zf.write(file_path, arcname)
+    
+    memory_file.seek(0)
+    
+    from flask import send_file
+    return send_file(
+        memory_file,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=f"experiment_{experiment_id[:8]}_artifacts.zip"
+    )
 
 
 @app.route("/experiments/compare")
@@ -762,7 +889,9 @@ def benchmark_evaluate_form(benchmark_id: str):
     completed_experiments = [
         e for e in experiments if e.get("status") == "completed" and e.get("experiment_type") == target_type
     ]
-    return render_template("benchmark_evaluate.html", benchmark=benchmark, experiments=completed_experiments)
+    compute_resp = requests.get(f"{API_BASE_URL}/compute/targets", timeout=10)
+    compute_targets = compute_resp.json().get("targets", []) if compute_resp.status_code == 200 else []
+    return render_template("benchmark_evaluate.html", benchmark=benchmark, experiments=completed_experiments, compute_targets=compute_targets)
 
 
 @app.route("/benchmarks/<benchmark_id>/evaluate", methods=["POST"])
@@ -1183,6 +1312,18 @@ def api_start_benchmark_eval(benchmark_id: str):
     payload = request.get_json()
     resp = requests.post(f"{API_BASE_URL}/benchmarks/{benchmark_id}/evaluate", json=payload, timeout=10)
     return jsonify(resp.json()), resp.status_code
+
+
+@app.route("/api/compute/targets/<target_id>/provision", methods=["POST"])
+def api_provision_compute_target(target_id: str):
+    """Proxy provision request to FastAPI - this can take a long time."""
+    try:
+        resp = requests.post(f"{API_BASE_URL}/compute/targets/{target_id}/provision", timeout=600)
+        return jsonify(resp.json()), resp.status_code
+    except requests.exceptions.Timeout:
+        return jsonify({"success": False, "detail": "Provisioning timed out after 10 minutes"}), 504
+    except Exception as e:
+        return jsonify({"success": False, "detail": str(e)}), 500
 
 
 if __name__ == "__main__":

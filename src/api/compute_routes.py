@@ -97,3 +97,119 @@ def test_target_connection(target_id: str) -> ComputeTargetTestResponse:
         python_version=python_version,
     )
 
+
+@router.post("/targets/{target_id}/provision")
+def provision_target(target_id: str) -> dict:
+    """Provision a compute target by installing dependencies and syncing code.
+    
+    Steps:
+    1. Install uv if not present
+    2. Create virtual environment
+    3. Sync pyproject.toml and install dependencies
+    4. Sync source code
+    """
+    from ..ssh_client import SSHClient
+    from pathlib import Path
+    
+    target = get_compute_target(target_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Compute target not found")
+
+    repo_root = Path(__file__).resolve().parents[2]
+    remote_work_dir = target.remote_work_dir
+    logs = []
+
+    try:
+        with SSHClient(target) as client:
+            # Create work directory
+            logs.append("Creating work directory...")
+            client.mkdir_p(remote_work_dir)
+
+            # Check/install uv
+            logs.append("Checking for uv...")
+            exit_code, stdout, _ = client.run_command("which uv || echo 'not found'")
+            if "not found" in stdout or exit_code != 0:
+                logs.append("Installing uv...")
+                exit_code, stdout, stderr = client.run_command(
+                    "curl -LsSf https://astral.sh/uv/install.sh | sh",
+                    timeout=120,
+                )
+                if exit_code != 0:
+                    raise HTTPException(status_code=500, detail=f"Failed to install uv: {stderr}")
+                logs.append("uv installed successfully")
+            else:
+                logs.append("uv already installed")
+
+            # Sync pyproject.toml
+            logs.append("Syncing pyproject.toml...")
+            pyproject_path = repo_root / "pyproject.toml"
+            if pyproject_path.exists():
+                client.upload_file(pyproject_path, f"{remote_work_dir}/pyproject.toml")
+                logs.append("pyproject.toml uploaded")
+            else:
+                logs.append("Warning: pyproject.toml not found locally")
+
+            # Create venv and install dependencies
+            logs.append("Creating virtual environment and installing dependencies...")
+            # Use $HOME/.local/bin/uv in case it's not in PATH yet
+            uv_cmd = "~/.local/bin/uv"
+            exit_code, stdout, stderr = client.run_command(
+                f"cd {remote_work_dir} && ({uv_cmd} venv .venv 2>/dev/null || {uv_cmd} venv .venv) && "
+                f"{uv_cmd} pip install -e . 2>&1",
+                timeout=600,
+            )
+            if exit_code != 0:
+                # Try with plain uv if ~/.local/bin/uv doesn't work
+                exit_code, stdout, stderr = client.run_command(
+                    f"cd {remote_work_dir} && (uv venv .venv 2>/dev/null || uv venv .venv) && "
+                    f"uv pip install -e . 2>&1",
+                    timeout=600,
+                )
+                if exit_code != 0:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to create venv/install deps: {stderr or stdout}",
+                    )
+            logs.append("Dependencies installed")
+
+            # Sync source code
+            logs.append("Syncing source code...")
+            src_dir = repo_root / "src"
+            if src_dir.exists():
+                client.upload_directory(src_dir, f"{remote_work_dir}/src")
+                logs.append("Source code synced")
+            else:
+                logs.append("Warning: src directory not found locally")
+
+            # Create data directories
+            logs.append("Creating data directories...")
+            client.mkdir_p(f"{remote_work_dir}/data/uploads")
+            client.mkdir_p(f"{remote_work_dir}/data/plugins")
+            client.mkdir_p(f"{remote_work_dir}/artifacts")
+            logs.append("Data directories created")
+
+            # Verify installation
+            logs.append("Verifying installation...")
+            exit_code, stdout, stderr = client.run_command(
+                f"cd {remote_work_dir} && .venv/bin/python -c 'import pydantic; print(pydantic.__version__)'",
+                timeout=30,
+            )
+            if exit_code == 0:
+                logs.append(f"Pydantic version: {stdout.strip()}")
+            else:
+                logs.append(f"Warning: Could not verify pydantic: {stderr}")
+
+        update_compute_target_status(target_id, "provisioned", "Environment provisioned successfully")
+        
+        return {
+            "success": True,
+            "message": "Environment provisioned successfully",
+            "logs": logs,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        update_compute_target_status(target_id, "failed", f"Provisioning failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Provisioning failed: {e}")
+

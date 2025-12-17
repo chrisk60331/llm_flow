@@ -42,6 +42,7 @@ from ..models import (
     PluginKind,
 )
 from ..remote_runner import run_experiment_remote
+from ..ssh_client import SSHClient
 from ..storage import (
     get_compute_target,
     get_config,
@@ -144,48 +145,131 @@ def _run_masked_lm_experiment(experiment_id: str, request: MaskedLMRequest, conf
     cfg = config_record.config
     auto_evaluate = getattr(cfg.training, "auto_evaluate", False)
 
-    config = ExperimentConfig(
-        data=DataConfig(
-            csv_path=Path(dataset_info.path),
-            text_fields=cfg.data.text_fields,
-            separator=cfg.data.separator,
-            validation_split=cfg.data.validation_split,
-            seed=cfg.data.seed,
-            max_length=cfg.data.max_length,
-        ),
-        model=ModelConfig(
-            pretrained_model_name=cfg.model.pretrained_model_name,
-            freeze_embedding=cfg.model.freeze_embedding,
-            freeze_encoder_layers=cfg.model.freeze_encoder_layers,
-        ),
-        training=TrainingConfig(
-            output_dir=output_dir,
-            num_train_epochs=cfg.training.num_train_epochs,
-            per_device_train_batch_size=cfg.training.per_device_train_batch_size,
-            per_device_eval_batch_size=cfg.training.per_device_eval_batch_size,
-            learning_rate=cfg.training.learning_rate,
-            weight_decay=cfg.training.weight_decay,
-            warmup_ratio=cfg.training.warmup_ratio,
-            logging_steps=cfg.training.logging_steps,
-            eval_steps=cfg.training.eval_steps,
-            save_steps=cfg.training.save_steps,
-            save_total_limit=cfg.training.save_total_limit,
-            gradient_accumulation_steps=cfg.training.gradient_accumulation_steps,
-            max_steps=cfg.training.max_steps,
-            early_stopping_patience=cfg.training.early_stopping_patience,
-            early_stopping_metric=cfg.training.early_stopping_metric,
-            early_stopping_greater_is_better=cfg.training.early_stopping_greater_is_better,
-            auto_evaluate=auto_evaluate,
-        ),
+    payload = {
+        "experiment_id": experiment_id,
+        "output_dir": str(output_dir),
+        "config": {
+            "data": {
+                "text_fields": cfg.data.text_fields,
+                "separator": cfg.data.separator,
+                "validation_split": cfg.data.validation_split,
+                "seed": cfg.data.seed,
+                "max_length": cfg.data.max_length,
+            },
+            "model": {
+                "pretrained_model_name": cfg.model.pretrained_model_name,
+                "freeze_embedding": cfg.model.freeze_embedding,
+                "freeze_encoder_layers": cfg.model.freeze_encoder_layers,
+            },
+            "training": {
+                "num_train_epochs": cfg.training.num_train_epochs,
+                "per_device_train_batch_size": cfg.training.per_device_train_batch_size,
+                "per_device_eval_batch_size": cfg.training.per_device_eval_batch_size,
+                "learning_rate": cfg.training.learning_rate,
+                "weight_decay": cfg.training.weight_decay,
+                "warmup_ratio": cfg.training.warmup_ratio,
+                "logging_steps": cfg.training.logging_steps,
+                "eval_steps": cfg.training.eval_steps,
+                "save_steps": cfg.training.save_steps,
+                "save_total_limit": cfg.training.save_total_limit,
+                "gradient_accumulation_steps": cfg.training.gradient_accumulation_steps,
+                "max_steps": cfg.training.max_steps,
+                "early_stopping_patience": cfg.training.early_stopping_patience,
+                "early_stopping_metric": cfg.training.early_stopping_metric,
+                "early_stopping_greater_is_better": cfg.training.early_stopping_greater_is_better,
+            },
+        },
+        "dataset": {
+            "path": dataset_info.path,
+            "filename": dataset_info.filename,
+        },
+    }
+
+    # Check for remote execution
+    if request.compute_target_id:
+        compute_target = get_compute_target(request.compute_target_id)
+        if not compute_target:
+            exp.status = ExperimentStatus.FAILED
+            exp.error = "Compute target not found"
+            exp.completed_at = now()
+            save_experiment(exp)
+            return
+
+        try:
+            from ..remote_runner import run_masked_lm_remote
+
+            def on_log_update(logs: str) -> None:
+                exp.logs = logs
+                save_experiment(exp)
+
+            success, metrics, error, logs = run_masked_lm_remote(
+                target=compute_target,
+                experiment_id=experiment_id,
+                payload=payload,
+                dataset_path=dataset_info.path,
+                on_log_update=on_log_update,
+            )
+
+            exp.logs = logs
+            if success:
+                exp.status = ExperimentStatus.COMPLETED
+                exp.metrics = metrics
+            else:
+                exp.status = ExperimentStatus.FAILED
+                exp.error = error or "Remote execution failed"
+        except Exception as e:
+            exp.status = ExperimentStatus.FAILED
+            exp.error = str(e)
+        finally:
+            exp.completed_at = now()
+            save_experiment(exp)
+
+        if auto_evaluate and exp.status == ExperimentStatus.COMPLETED:
+            _run_all_benchmarks_for_experiment(experiment_id)
+        return
+
+    # Local execution via subprocess
+    output_dir.mkdir(parents=True, exist_ok=True)
+    payload_path = output_dir / "runner_payload.json"
+    payload_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "src.masked_lm_runner", str(payload_path)],
+        cwd=str(_repo_root()),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
     )
 
+    stopped = False
     try:
-        _, metrics = run_training(config, experiment_id=experiment_id)
-        if stop_registry.get(experiment_id):
+        while proc.poll() is None:
+            if stop_registry.get(experiment_id):
+                stopped = True
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except Exception:
+                    proc.kill()
+                break
+            time.sleep(0.5)
+
+        stdout, stderr = proc.communicate(timeout=1)
+        if stdout:
+            (output_dir / "runner_stdout.txt").write_text(stdout, encoding="utf-8")
+        if stderr:
+            (output_dir / "runner_stderr.txt").write_text(stderr, encoding="utf-8")
+
+        if stopped:
             exp.status = ExperimentStatus.STOPPED
-        else:
+        elif proc.returncode == 0:
             exp.status = ExperimentStatus.COMPLETED
-        exp.metrics = metrics
+            metrics_file = output_dir / "metrics.json"
+            if metrics_file.exists():
+                exp.metrics = json.loads(metrics_file.read_text(encoding="utf-8"))
+        else:
+            exp.status = ExperimentStatus.FAILED
+            exp.error = stderr or "Runner failed with no error message"
     except Exception as e:
         exp.status = ExperimentStatus.FAILED
         exp.error = str(e)
@@ -193,7 +277,7 @@ def _run_masked_lm_experiment(experiment_id: str, request: MaskedLMRequest, conf
         exp.completed_at = now()
         stop_registry.pop(experiment_id, None)
         save_experiment(exp)
-    
+
     if auto_evaluate and exp.status == ExperimentStatus.COMPLETED:
         _run_all_benchmarks_for_experiment(experiment_id)
 
@@ -210,66 +294,149 @@ def _run_causal_lm_experiment(experiment_id: str, request: CausalLMRequest, conf
     cfg = config_record.config
     auto_evaluate = getattr(cfg.training, "auto_evaluate", False)
 
-    peft_config = None
+    peft_payload = None
     if cfg.peft.enabled:
-        peft_config = LLMPeftConfig(
-            enabled=True,
-            r=cfg.peft.r,
-            lora_alpha=cfg.peft.lora_alpha,
-            lora_dropout=cfg.peft.lora_dropout,
-            bias=cfg.peft.bias,
-            target_modules=cfg.peft.target_modules,
-        )
+        peft_payload = {
+            "enabled": True,
+            "r": cfg.peft.r,
+            "lora_alpha": cfg.peft.lora_alpha,
+            "lora_dropout": cfg.peft.lora_dropout,
+            "bias": cfg.peft.bias,
+            "target_modules": cfg.peft.target_modules,
+        }
 
-    config = LLMExperimentConfig(
-        data=LLMDataConfig(
-            csv_path=Path(dataset_info.path),
-            question_field=cfg.data.question_field,
-            answer_field=cfg.data.answer_field,
-            system_prompt=cfg.data.system_prompt,
-            template=cfg.data.template,
-            validation_split=cfg.data.validation_split,
-            seed=cfg.data.seed,
-            max_length=cfg.data.max_length,
-        ),
-        model=LLMModelConfig(
-            pretrained_model_name=cfg.model.pretrained_model_name,
-            trust_remote_code=cfg.model.trust_remote_code,
-            pad_token_override=cfg.model.pad_token_override,
-        ),
-        training=LLMTrainingConfig(
-            output_dir=output_dir,
-            num_train_epochs=cfg.training.num_train_epochs,
-            per_device_train_batch_size=cfg.training.per_device_train_batch_size,
-            per_device_eval_batch_size=cfg.training.per_device_eval_batch_size,
-            learning_rate=cfg.training.learning_rate,
-            weight_decay=cfg.training.weight_decay,
-            warmup_ratio=cfg.training.warmup_ratio,
-            logging_steps=cfg.training.logging_steps,
-            eval_steps=cfg.training.eval_steps,
-            save_steps=cfg.training.save_steps,
-            save_total_limit=cfg.training.save_total_limit,
-            gradient_accumulation_steps=cfg.training.gradient_accumulation_steps,
-            max_steps=cfg.training.max_steps,
-            lr_scheduler_type=cfg.training.lr_scheduler_type,
-            gradient_checkpointing=cfg.training.gradient_checkpointing,
-            bf16=cfg.training.bf16,
-            fp16=cfg.training.fp16,
-            early_stopping_patience=cfg.training.early_stopping_patience,
-            early_stopping_metric=cfg.training.early_stopping_metric,
-            early_stopping_greater_is_better=cfg.training.early_stopping_greater_is_better,
-            auto_evaluate=auto_evaluate,
-        ),
-        peft=peft_config,
+    payload = {
+        "experiment_id": experiment_id,
+        "output_dir": str(output_dir),
+        "config": {
+            "data": {
+                "question_field": cfg.data.question_field,
+                "answer_field": cfg.data.answer_field,
+                "system_prompt": cfg.data.system_prompt,
+                "template": cfg.data.template,
+                "validation_split": cfg.data.validation_split,
+                "seed": cfg.data.seed,
+                "max_length": cfg.data.max_length,
+            },
+            "model": {
+                "pretrained_model_name": cfg.model.pretrained_model_name,
+                "trust_remote_code": cfg.model.trust_remote_code,
+                "pad_token_override": cfg.model.pad_token_override,
+            },
+            "training": {
+                "num_train_epochs": cfg.training.num_train_epochs,
+                "per_device_train_batch_size": cfg.training.per_device_train_batch_size,
+                "per_device_eval_batch_size": cfg.training.per_device_eval_batch_size,
+                "learning_rate": cfg.training.learning_rate,
+                "weight_decay": cfg.training.weight_decay,
+                "warmup_ratio": cfg.training.warmup_ratio,
+                "logging_steps": cfg.training.logging_steps,
+                "eval_steps": cfg.training.eval_steps,
+                "save_steps": cfg.training.save_steps,
+                "save_total_limit": cfg.training.save_total_limit,
+                "gradient_accumulation_steps": cfg.training.gradient_accumulation_steps,
+                "max_steps": cfg.training.max_steps,
+                "lr_scheduler_type": cfg.training.lr_scheduler_type,
+                "gradient_checkpointing": cfg.training.gradient_checkpointing,
+                "bf16": cfg.training.bf16,
+                "fp16": cfg.training.fp16,
+                "early_stopping_patience": cfg.training.early_stopping_patience,
+                "early_stopping_metric": cfg.training.early_stopping_metric,
+                "early_stopping_greater_is_better": cfg.training.early_stopping_greater_is_better,
+            },
+        },
+        "dataset": {
+            "path": dataset_info.path,
+            "filename": dataset_info.filename,
+        },
+        "peft": peft_payload,
+    }
+
+    # Check for remote execution
+    if request.compute_target_id:
+        compute_target = get_compute_target(request.compute_target_id)
+        if not compute_target:
+            exp.status = ExperimentStatus.FAILED
+            exp.error = "Compute target not found"
+            exp.completed_at = now()
+            save_experiment(exp)
+            return
+
+        try:
+            from ..remote_runner import run_causal_lm_remote
+
+            def on_log_update(logs: str) -> None:
+                exp.logs = logs
+                save_experiment(exp)
+
+            success, metrics, error, logs = run_causal_lm_remote(
+                target=compute_target,
+                experiment_id=experiment_id,
+                payload=payload,
+                dataset_path=dataset_info.path,
+                on_log_update=on_log_update,
+            )
+
+            exp.logs = logs
+            if success:
+                exp.status = ExperimentStatus.COMPLETED
+                exp.metrics = metrics
+            else:
+                exp.status = ExperimentStatus.FAILED
+                exp.error = error or "Remote execution failed"
+        except Exception as e:
+            exp.status = ExperimentStatus.FAILED
+            exp.error = str(e)
+        finally:
+            exp.completed_at = now()
+            save_experiment(exp)
+
+        if auto_evaluate and exp.status == ExperimentStatus.COMPLETED:
+            _run_all_benchmarks_for_experiment(experiment_id)
+        return
+
+    # Local execution via subprocess
+    output_dir.mkdir(parents=True, exist_ok=True)
+    payload_path = output_dir / "runner_payload.json"
+    payload_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "src.causal_lm_runner", str(payload_path)],
+        cwd=str(_repo_root()),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
     )
 
+    stopped = False
     try:
-        _, metrics = run_llm_training(config, experiment_id=experiment_id)
-        if stop_registry.get(experiment_id):
+        while proc.poll() is None:
+            if stop_registry.get(experiment_id):
+                stopped = True
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except Exception:
+                    proc.kill()
+                break
+            time.sleep(0.5)
+
+        stdout, stderr = proc.communicate(timeout=1)
+        if stdout:
+            (output_dir / "runner_stdout.txt").write_text(stdout, encoding="utf-8")
+        if stderr:
+            (output_dir / "runner_stderr.txt").write_text(stderr, encoding="utf-8")
+
+        if stopped:
             exp.status = ExperimentStatus.STOPPED
-        else:
+        elif proc.returncode == 0:
             exp.status = ExperimentStatus.COMPLETED
-        exp.metrics = metrics
+            metrics_file = output_dir / "metrics.json"
+            if metrics_file.exists():
+                exp.metrics = json.loads(metrics_file.read_text(encoding="utf-8"))
+        else:
+            exp.status = ExperimentStatus.FAILED
+            exp.error = stderr or "Runner failed with no error message"
     except Exception as e:
         exp.status = ExperimentStatus.FAILED
         exp.error = str(e)
@@ -277,7 +444,7 @@ def _run_causal_lm_experiment(experiment_id: str, request: CausalLMRequest, conf
         exp.completed_at = now()
         stop_registry.pop(experiment_id, None)
         save_experiment(exp)
-    
+
     if auto_evaluate and exp.status == ExperimentStatus.COMPLETED:
         _run_all_benchmarks_for_experiment(experiment_id)
 
@@ -392,14 +559,21 @@ def _run_custom_lightning_experiment(
 
         try:
             plugin_paths = [lightning_plugin.path, dl_plugin.path]
-            success, metrics, error = run_experiment_remote(
+
+            def on_log_update(logs: str) -> None:
+                exp.logs = logs
+                save_experiment(exp)
+
+            success, metrics, error, logs = run_experiment_remote(
                 target=compute_target,
                 experiment_id=experiment_id,
                 payload=payload,
                 dataset_path=dataset_info.path,
                 plugin_paths=plugin_paths,
+                on_log_update=on_log_update,
             )
 
+            exp.logs = logs
             if success:
                 exp.status = ExperimentStatus.COMPLETED
                 exp.metrics = metrics
@@ -519,6 +693,11 @@ def start_masked_lm_experiment(request: MaskedLMRequest) -> ExperimentStartRespo
     )
 
     experiment_id = str(uuid.uuid4())
+    compute_target_name = None
+    if request.compute_target_id:
+        ct = get_compute_target(request.compute_target_id)
+        if ct:
+            compute_target_name = ct.name
     exp = ExperimentResult(
         id=experiment_id,
         experiment_type=ExperimentType.MASKED_LM,
@@ -527,6 +706,8 @@ def start_masked_lm_experiment(request: MaskedLMRequest) -> ExperimentStartRespo
         dataset_filename=dataset_info.filename,
         config_id=config_id,
         started_at=now(),
+        compute_target_id=request.compute_target_id,
+        compute_target_name=compute_target_name,
     )
     save_experiment(exp)
 
@@ -554,6 +735,11 @@ def start_causal_lm_experiment(request: CausalLMRequest) -> ExperimentStartRespo
     )
 
     experiment_id = str(uuid.uuid4())
+    compute_target_name = None
+    if request.compute_target_id:
+        ct = get_compute_target(request.compute_target_id)
+        if ct:
+            compute_target_name = ct.name
     exp = ExperimentResult(
         id=experiment_id,
         experiment_type=ExperimentType.CAUSAL_LM,
@@ -562,6 +748,8 @@ def start_causal_lm_experiment(request: CausalLMRequest) -> ExperimentStartRespo
         dataset_filename=dataset_info.filename,
         config_id=config_id,
         started_at=now(),
+        compute_target_id=request.compute_target_id,
+        compute_target_name=compute_target_name,
     )
     save_experiment(exp)
 
@@ -595,6 +783,11 @@ def start_custom_lightning_experiment(request: CustomLightningRequest) -> Experi
     save_config(record)
 
     experiment_id = str(uuid.uuid4())
+    compute_target_name = None
+    if request.compute_target_id:
+        ct = get_compute_target(request.compute_target_id)
+        if ct:
+            compute_target_name = ct.name
     exp = ExperimentResult(
         id=experiment_id,
         experiment_type=ExperimentType.CUSTOM_LIGHTNING,
@@ -607,6 +800,8 @@ def start_custom_lightning_experiment(request: CustomLightningRequest) -> Experi
         lightning_module_class_name=request.lightning_module_class_name,
         dataloaders_plugin_id=request.dataloaders_plugin_id,
         dataloaders_function_name=request.dataloaders_function_name,
+        compute_target_id=request.compute_target_id,
+        compute_target_name=compute_target_name,
     )
     save_experiment(exp)
 
@@ -636,12 +831,89 @@ def get_experiment_by_id(experiment_id: str) -> ExperimentResult:
     return exp
 
 
+def _expand_remote_work_dir(client: SSHClient) -> str:
+    """Expand ~ in remote_work_dir using remote $HOME."""
+    remote_work_dir = client.target.remote_work_dir
+    if remote_work_dir.startswith("~/"):
+        exit_code, stdout, _ = client.run_command("echo $HOME")
+        if exit_code == 0:
+            home = stdout.strip()
+            remote_work_dir = remote_work_dir.replace("~", home, 1)
+    return remote_work_dir
+
+
+def _remote_output_paths(exp: ExperimentResult, target) -> tuple[str | None, str | None, str | None]:
+    """Return remote paths for training logs, progress, and runner.log based on experiment type."""
+    remote_work_dir = target.remote_work_dir
+    if remote_work_dir.startswith("~/"):
+        # Expansion is performed in the caller with SSH
+        pass
+
+    base_name = None
+    progress = None
+    if exp.experiment_type == ExperimentType.CAUSAL_LM:
+        base_name = f"causal_lm_{exp.id}"
+    elif exp.experiment_type == ExperimentType.MASKED_LM:
+        base_name = f"masked_lm_{exp.id}"
+    elif exp.experiment_type == ExperimentType.CUSTOM_LIGHTNING:
+        base_name = f"custom_lightning_{exp.id}"
+        progress = "progress.json"
+
+    logs_path: str | None = None
+    runner_log_path: str | None = None
+    if base_name:
+        logs_path = f"{remote_work_dir}/artifacts/{base_name}/training_logs.json"
+        runner_log_path = f"{remote_work_dir}/artifacts/{base_name}/runner.log"
+        if progress:
+            progress = f"{remote_work_dir}/artifacts/{base_name}/{progress}"
+    return logs_path, progress, runner_log_path
+
+
 @router.get("/experiments/{experiment_id}/progress")
 def get_experiment_progress(experiment_id: str) -> dict:
     """Get live training progress for an experiment (updated every step)."""
     exp = get_experiment(experiment_id)
     if not exp:
         raise HTTPException(status_code=404, detail="Experiment not found")
+
+    # Remote streaming: try reading progress/training logs directly from remote host
+    if exp.compute_target_id and exp.status in {
+        ExperimentStatus.RUNNING,
+        ExperimentStatus.PENDING,
+        ExperimentStatus.EVALUATING,
+    }:
+        target = get_compute_target(exp.compute_target_id)
+        if target:
+            try:
+                with SSHClient(target) as client:
+                    remote_work_dir = _expand_remote_work_dir(client)
+                    target.remote_work_dir = remote_work_dir  # type: ignore[attr-defined]
+                    logs_path, progress_path, _ = _remote_output_paths(exp, target)
+
+                    # Prefer explicit progress.json for lightning
+                    if progress_path and client.file_exists(progress_path):
+                        payload = json.loads(client.read_file(progress_path))
+                        return {
+                            "global_step": int(payload.get("global_step", 0) or 0),
+                            "epoch": float(payload.get("epoch", 0) or 0),
+                            "max_steps": int(payload.get("max_steps", 0) or 0),
+                        }
+
+                    # Otherwise, derive progress from training_logs.json
+                    if logs_path and client.file_exists(logs_path):
+                        logs_content = client.read_file(logs_path)
+                        logs = json.loads(logs_content) if logs_content else []
+                        if isinstance(logs, list) and logs:
+                            last = logs[-1]
+                            return {
+                                "global_step": int(last.get("step", 0) or last.get("global_step", 0) or 0),
+                                "epoch": float(last.get("epoch", 0) or 0),
+                                "max_steps": int(last.get("max_steps", 0) or 0),
+                            }
+            except Exception:
+                # Fall back to existing logic if remote read fails
+                pass
+
     if exp.experiment_type == ExperimentType.CUSTOM_LIGHTNING and exp.output_dir:
         p = Path(exp.output_dir) / "progress.json"
         if p.exists():
@@ -654,6 +926,15 @@ def get_experiment_progress(experiment_id: str) -> dict:
         return {"global_step": 0, "epoch": 0, "max_steps": 0}
 
     progress = progress_registry.get(experiment_id, {})
+    # Remote fallback: derive progress from remote runner logs (stored on ExperimentResult.logs)
+    if exp.compute_target_id and exp.logs:
+        last = _parse_latest_training_log_from_text(exp.logs)
+        if last:
+            return {
+                "global_step": int(last.get("step", 0) or 0),
+                "epoch": float(last.get("epoch", 0) or 0),
+                "max_steps": int(last.get("max_steps", 0) or 0),
+            }
     return {
         "global_step": progress.get("global_step", 0),
         "epoch": progress.get("epoch", 0),
@@ -666,7 +947,45 @@ def get_experiment_logs(experiment_id: str) -> dict:
     exp = get_experiment(experiment_id)
     if not exp:
         raise HTTPException(status_code=404, detail="Experiment not found")
+
+    # Remote streaming: read training_logs.json directly from remote host (even after completion)
+    if exp.compute_target_id:
+        target = get_compute_target(exp.compute_target_id)
+        if target:
+            try:
+                with SSHClient(target) as client:
+                    remote_work_dir = _expand_remote_work_dir(client)
+                    target.remote_work_dir = remote_work_dir  # type: ignore[attr-defined]
+                    logs_path, _, runner_log_path = _remote_output_paths(exp, target)
+                    if logs_path and client.file_exists(logs_path):
+                        logs_content = client.read_file(logs_path)
+                        if logs_content:
+                            try:
+                                logs = json.loads(logs_content)
+                            except json.JSONDecodeError:
+                                # Fallback to tolerant parse if mid-write
+                                import ast
+
+                                try:
+                                    logs = ast.literal_eval(logs_content)
+                                except Exception:
+                                    logs = []
+                            if isinstance(logs, list):
+                                return {"logs": logs}
+                    # Fallback: parse runner.log for log dicts if training_logs.json not yet present
+                    if runner_log_path and client.file_exists(runner_log_path):
+                        runner_logs = client.read_file(runner_log_path)
+                        parsed = _parse_training_logs_from_text(runner_logs)
+                        if parsed:
+                            return {"logs": parsed}
+            except Exception:
+                # Fall through to local/parsed fallbacks
+                pass
+
     if not exp.output_dir:
+        # Remote fallback (no local output dir yet)
+        if exp.compute_target_id and exp.logs:
+            return {"logs": _parse_training_logs_from_text(exp.logs)}
         return {"logs": []}
 
     output_path = Path(exp.output_dir)
@@ -685,7 +1004,66 @@ def get_experiment_logs(experiment_id: str) -> dict:
                 state = json.load(f)
                 return {"logs": state.get("log_history", [])}
 
+    # Remote fallback: during remote runs we may not have downloaded artifacts yet
+    if exp.compute_target_id and exp.logs:
+        return {"logs": _parse_training_logs_from_text(exp.logs)}
+
     return {"logs": []}
+
+
+def _parse_training_logs_from_text(text: str) -> list[dict]:
+    """Best-effort parse of Trainer-style log dicts printed to stdout.
+
+    The UI expects a list of dicts like HuggingFace Trainer log_history entries.
+    We only parse simple dict literals found in logs and ignore anything else.
+    """
+    import ast
+    import re
+
+    logs: list[dict] = []
+    if not text:
+        return logs
+
+    # Common trainer output includes dict literals (often single quotes):
+    # {'loss': 1.23, 'learning_rate': 1e-4, 'epoch': 0.12}
+    dict_pat = re.compile(r"\{[^{}]*\}")
+
+    for line in text.splitlines():
+        m = dict_pat.search(line)
+        if not m:
+            continue
+        snippet = m.group(0)
+        try:
+            obj = ast.literal_eval(snippet)
+        except Exception:
+            continue
+        if not isinstance(obj, dict):
+            continue
+
+        # Keep only numeric-ish fields we graph/table
+        entry: dict = {}
+        for k in ("step", "global_step", "epoch", "loss", "eval_loss", "learning_rate", "grad_norm"):
+            if k in obj:
+                entry[k] = obj[k]
+
+        if not entry:
+            continue
+
+        # Normalize step key
+        if "step" not in entry and "global_step" in entry:
+            entry["step"] = entry["global_step"]
+        entry.pop("global_step", None)
+
+        logs.append(entry)
+
+    return logs
+
+
+def _parse_latest_training_log_from_text(text: str) -> dict | None:
+    logs = _parse_training_logs_from_text(text)
+    if not logs:
+        return None
+    return logs[-1]
 
 
 @router.delete("/experiments/{experiment_id}")

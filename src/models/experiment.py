@@ -36,6 +36,11 @@ class ExperimentResult(BaseModel):
     auto_eval_total: int = Field(default=0, description="Total benchmarks to evaluate")
     auto_eval_completed: int = Field(default=0, description="Benchmarks completed so far")
     auto_eval_current: str | None = Field(default=None, description="Name of benchmark currently running")
+    # Compute target for remote execution
+    compute_target_id: str | None = Field(default=None, description="ID of compute target used")
+    compute_target_name: str | None = Field(default=None, description="Name of compute target used")
+    # Remote execution logs
+    logs: str | None = Field(default=None, description="Logs from remote execution")
 
 
 class ExperimentListResponse(BaseModel):
