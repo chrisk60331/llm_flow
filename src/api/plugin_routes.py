@@ -123,3 +123,47 @@ def delete_plugin_by_id(plugin_id: str) -> dict[str, str]:
     return {"status": "deleted", "plugin_id": plugin_id}
 
 
+@router.get("/plugins/{plugin_id}/source")
+def get_plugin_source(plugin_id: str) -> dict[str, str]:
+    plugin = get_plugin(plugin_id)
+    if not plugin:
+        raise HTTPException(status_code=404, detail="Plugin not found")
+    path = Path(plugin.path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Plugin file not found on disk")
+    source = path.read_text(encoding="utf-8")
+    return {"source": source, "plugin_id": plugin_id, "name": plugin.name, "kind": plugin.kind.value}
+
+
+@router.post("/plugins/create-from-source", response_model=PluginUploadResponse)
+def create_plugin_from_source(
+    kind: PluginKind,
+    name: str,
+    source: str,
+) -> PluginUploadResponse:
+    plugin_id = str(uuid.uuid4())
+    safe_name = "".join(c if c.isalnum() or c in "_-" else "_" for c in name)
+    dest_path = PLUGINS_DIR / f"{plugin_id}_{kind.value}_{safe_name}.py"
+
+    try:
+        symbols = _discover_symbols(kind, source)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    dest_path.write_text(source, encoding="utf-8")
+    sha256 = hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+    record = PluginRecord(
+        id=plugin_id,
+        name=name,
+        kind=kind,
+        filename=f"{safe_name}.py",
+        path=str(dest_path),
+        sha256=sha256,
+        symbols=symbols,
+        uploaded_at=now(),
+    )
+    save_plugin(record)
+    return PluginUploadResponse(plugin=record)
+
+

@@ -8,14 +8,21 @@ from .database import get_connection
 
 
 def save_compute_target(target: ComputeTarget) -> None:
-    """Save or update a compute target."""
+    """Insert a compute target. Compute targets are immutable (except status/active)."""
     with get_connection() as conn:
+        existing = conn.execute(
+            "SELECT 1 FROM compute_targets WHERE id = ?",
+            (target.id,),
+        ).fetchone()
+        if existing:
+            raise ValueError(f"Compute target already exists: {target.id}")
+
         conn.execute(
             """
-            INSERT OR REPLACE INTO compute_targets
+            INSERT INTO compute_targets
             (id, name, ssh_host, ssh_port, ssh_user, auth_type, ssh_key_path, ssh_password,
-             remote_work_dir, created_at, last_tested_at, status, status_message)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             remote_work_dir, created_at, active, last_tested_at, status, status_message)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 target.id,
@@ -28,6 +35,7 @@ def save_compute_target(target: ComputeTarget) -> None:
                 target.ssh_password,
                 target.remote_work_dir,
                 target.created_at.isoformat(),
+                1 if target.active else 0,
                 target.last_tested_at.isoformat() if target.last_tested_at else None,
                 target.status,
                 target.status_message,
@@ -47,12 +55,17 @@ def get_compute_target(target_id: str) -> ComputeTarget | None:
         return _row_to_compute_target(row)
 
 
-def list_compute_targets() -> list[ComputeTarget]:
-    """List all compute targets."""
+def list_compute_targets(*, include_inactive: bool = False) -> list[ComputeTarget]:
+    """List compute targets."""
     with get_connection() as conn:
-        rows = conn.execute(
-            "SELECT * FROM compute_targets ORDER BY created_at DESC"
-        ).fetchall()
+        if include_inactive:
+            rows = conn.execute(
+                "SELECT * FROM compute_targets ORDER BY created_at DESC"
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM compute_targets WHERE active = 1 ORDER BY created_at DESC"
+            ).fetchall()
         return [_row_to_compute_target(row) for row in rows]
 
 
@@ -85,6 +98,16 @@ def update_compute_target_status(
         conn.commit()
 
 
+def set_compute_target_active(target_id: str, *, active: bool) -> None:
+    """Set compute target active flag."""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE compute_targets SET active = ? WHERE id = ?",
+            (1 if active else 0, target_id),
+        )
+        conn.commit()
+
+
 def _row_to_compute_target(row) -> ComputeTarget:
     """Convert a database row to a ComputeTarget model."""
     return ComputeTarget(
@@ -98,6 +121,7 @@ def _row_to_compute_target(row) -> ComputeTarget:
         ssh_password=row["ssh_password"],
         remote_work_dir=row["remote_work_dir"],
         created_at=datetime.fromisoformat(row["created_at"]),
+        active=bool(row["active"]),
         last_tested_at=(
             datetime.fromisoformat(row["last_tested_at"])
             if row["last_tested_at"]

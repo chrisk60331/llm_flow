@@ -140,6 +140,22 @@ def delete_plugin(plugin_id: str):
     return redirect(url_for("plugins_page"))
 
 
+@app.route("/plugins/create-from-source", methods=["POST"])
+def create_plugin_from_source():
+    kind = request.form.get("kind")
+    name = request.form.get("name", "").strip()
+    source = request.form.get("source", "")
+    if not kind or not name or not source:
+        return redirect(url_for("plugins_page"))
+    
+    resp = requests.post(
+        f"{API_BASE_URL}/plugins/create-from-source",
+        params={"kind": kind, "name": name, "source": source},
+        timeout=30,
+    )
+    return redirect(url_for("plugins_page"))
+
+
 # ============================================================================
 # Configs
 # ============================================================================
@@ -1140,9 +1156,13 @@ def meta_optimize_results(job_id: str):
 def compute_page():
     targets = []
     test_result = None
+    show_inactive = request.args.get("show_inactive") == "1"
     
     try:
-        resp = requests.get(f"{API_BASE_URL}/compute/targets", timeout=10)
+        url = f"{API_BASE_URL}/compute/targets"
+        if show_inactive:
+            url = f"{url}?include_inactive=true"
+        resp = requests.get(url, timeout=10)
         if resp.status_code == 200:
             targets = resp.json().get("targets", [])
     except Exception:
@@ -1156,7 +1176,12 @@ def compute_page():
             "python_version": request.args.get("test_python_version"),
         }
     
-    return render_template("compute.html", targets=targets, test_result=test_result)
+    return render_template(
+        "compute.html",
+        targets=targets,
+        test_result=test_result,
+        show_inactive=show_inactive,
+    )
 
 
 @app.route("/compute/new", methods=["POST"])
@@ -1200,6 +1225,17 @@ def test_compute_target(target_id: str):
 @app.route("/compute/<target_id>/delete", methods=["POST"])
 def delete_compute_target(target_id: str):
     requests.delete(f"{API_BASE_URL}/compute/targets/{target_id}", timeout=10)
+    return redirect(url_for("compute_page"))
+
+@app.route("/compute/<target_id>/deactivate", methods=["POST"])
+def deactivate_compute_target(target_id: str):
+    requests.post(f"{API_BASE_URL}/compute/targets/{target_id}/deactivate", timeout=10)
+    return redirect(url_for("compute_page"))
+
+
+@app.route("/compute/<target_id>/copy", methods=["POST"])
+def copy_compute_target(target_id: str):
+    requests.post(f"{API_BASE_URL}/compute/targets/{target_id}/copy", timeout=10)
     return redirect(url_for("compute_page"))
 
 
@@ -1324,6 +1360,13 @@ def api_provision_compute_target(target_id: str):
         return jsonify({"success": False, "detail": "Provisioning timed out after 10 minutes"}), 504
     except Exception as e:
         return jsonify({"success": False, "detail": str(e)}), 500
+
+
+@app.route("/api/plugins/<plugin_id>/source")
+def api_plugin_source(plugin_id: str):
+    """Get plugin source code for viewing/editing."""
+    resp = requests.get(f"{API_BASE_URL}/plugins/{plugin_id}/source", timeout=10)
+    return jsonify(resp.json()), resp.status_code
 
 
 if __name__ == "__main__":

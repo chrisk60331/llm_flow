@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from ..models import (
     ComputeTarget,
@@ -17,6 +17,7 @@ from ..storage import (
     get_compute_target,
     list_compute_targets,
     save_compute_target,
+    set_compute_target_active,
     update_compute_target_status,
 )
 from .helpers import now
@@ -25,9 +26,11 @@ router = APIRouter(prefix="/compute", tags=["compute"])
 
 
 @router.get("/targets", response_model=ComputeTargetListResponse)
-def list_targets() -> ComputeTargetListResponse:
-    """List all compute targets."""
-    return ComputeTargetListResponse(targets=list_compute_targets())
+def list_targets(
+    include_inactive: bool = Query(default=False, description="Include inactive compute targets"),
+) -> ComputeTargetListResponse:
+    """List compute targets."""
+    return ComputeTargetListResponse(targets=list_compute_targets(include_inactive=include_inactive))
 
 
 @router.post("/targets", response_model=ComputeTarget)
@@ -55,6 +58,7 @@ def create_target(request: ComputeTargetCreate) -> ComputeTarget:
         ssh_password=request.ssh_password,
         remote_work_dir=request.remote_work_dir,
         created_at=now(),
+        active=True,
         status="unknown",
     )
     save_compute_target(target)
@@ -77,6 +81,44 @@ def delete_target(target_id: str) -> dict[str, str]:
     if not target:
         raise HTTPException(status_code=404, detail="Compute target not found")
     return {"status": "deleted", "target_id": target_id}
+
+
+@router.post("/targets/{target_id}/deactivate", response_model=ComputeTarget)
+def deactivate_target(target_id: str) -> ComputeTarget:
+    """Deactivate a compute target (soft-delete)."""
+    target = get_compute_target(target_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Compute target not found")
+    set_compute_target_active(target_id, active=False)
+    target.active = False
+    return target
+
+
+@router.post("/targets/{target_id}/copy", response_model=ComputeTarget)
+def copy_target(target_id: str) -> ComputeTarget:
+    """Copy a compute target (creates a new immutable target)."""
+    source = get_compute_target(target_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Compute target not found")
+
+    cloned = ComputeTarget(
+        id=str(uuid.uuid4()),
+        name=f"{source.name} (copy)",
+        ssh_host=source.ssh_host,
+        ssh_port=source.ssh_port,
+        ssh_user=source.ssh_user,
+        auth_type=source.auth_type,
+        ssh_key_path=source.ssh_key_path,
+        ssh_password=source.ssh_password,
+        remote_work_dir=source.remote_work_dir,
+        created_at=now(),
+        active=True,
+        status="unknown",
+        status_message=None,
+        last_tested_at=None,
+    )
+    save_compute_target(cloned)
+    return cloned
 
 
 @router.post("/targets/{target_id}/test", response_model=ComputeTargetTestResponse)

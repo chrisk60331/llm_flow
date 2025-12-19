@@ -33,6 +33,7 @@ class ComputeTarget(ComputeTargetCreate):
 
     id: str
     created_at: datetime
+    active: bool = True
     last_tested_at: datetime | None = None
     status: Literal["unknown", "connected", "failed", "provisioned"] = "unknown"
     status_message: str | None = None

@@ -107,6 +107,7 @@ from .compute_store import (
     get_compute_target,
     list_compute_targets,
     save_compute_target,
+    set_compute_target_active,
     update_compute_target_status,
 )
 
@@ -117,6 +118,7 @@ __all__.extend(
         "get_compute_target",
         "list_compute_targets",
         "save_compute_target",
+        "set_compute_target_active",
         "update_compute_target_status",
     ]
 )

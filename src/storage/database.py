@@ -162,6 +162,7 @@ def init_db() -> None:
                 ssh_password TEXT,
                 remote_work_dir TEXT NOT NULL DEFAULT '~/evalledger',
                 created_at TEXT NOT NULL,
+                active INTEGER NOT NULL DEFAULT 1,
                 last_tested_at TEXT,
                 status TEXT NOT NULL DEFAULT 'unknown',
                 status_message TEXT
@@ -171,6 +172,7 @@ def init_db() -> None:
     _migrate_experiments_to_config_id()
     _migrate_experiments_add_custom_lightning_fields()
     _migrate_experiments_add_compute_target()
+    _migrate_compute_targets_add_active()
     _migrate_benchmark_evals_add_rouge()
     _migrate_benchmarks_add_inference_settings()
     _migrate_benchmarks_add_type_and_spec()
@@ -211,6 +213,18 @@ def _migrate_experiments_add_compute_target() -> None:
             conn.execute("ALTER TABLE experiments ADD COLUMN compute_target_name TEXT")
         if "logs" not in columns:
             conn.execute("ALTER TABLE experiments ADD COLUMN logs TEXT")
+        conn.commit()
+
+
+def _migrate_compute_targets_add_active() -> None:
+    """Add active column to compute_targets table if missing."""
+    with get_connection() as conn:
+        cursor = conn.execute("PRAGMA table_info(compute_targets)")
+        columns = {row["name"] for row in cursor.fetchall()}
+        if "active" not in columns:
+            conn.execute("ALTER TABLE compute_targets ADD COLUMN active INTEGER NOT NULL DEFAULT 1")
+        # Ensure existing rows are active by default.
+        conn.execute("UPDATE compute_targets SET active = 1 WHERE active IS NULL")
         conn.commit()
 
 

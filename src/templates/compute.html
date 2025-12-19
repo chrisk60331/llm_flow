@@ -9,12 +9,26 @@
             <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Compute Targets</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage remote SSH servers for running experiments</p>
         </div>
-        <button onclick="openAddModal()" class="btn-primary flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-            </svg>
-            Add Compute Target
-        </button>
+        <div class="flex items-center gap-4">
+            <form action="{{ url_for('compute_page') }}" method="GET" class="flex items-center gap-2">
+                <input
+                    id="showInactive"
+                    name="show_inactive"
+                    value="1"
+                    type="checkbox"
+                    class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    {% if show_inactive %}checked{% endif %}
+                    onchange="this.form.submit()"
+                >
+                <label for="showInactive" class="text-sm text-gray-600 dark:text-gray-300 select-none">Show inactive</label>
+            </form>
+            <button onclick="openAddModal()" class="btn-primary flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Add Compute Target
+            </button>
+        </div>
     </div>
 
     <!-- Compute Targets List -->
@@ -41,7 +55,12 @@
                         {% for target in targets %}
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                             <td class="py-3 pr-4">
-                                <span class="font-medium text-gray-900 dark:text-gray-100">{{ target.name }}</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="font-medium text-gray-900 dark:text-gray-100">{{ target.name }}</span>
+                                    {% if target.active is defined and not target.active %}
+                                    <span class="badge badge-gray">Inactive</span>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td class="py-3 pr-4">
                                 <span class="text-gray-600 dark:text-gray-300 font-mono text-sm">{{ target.ssh_host }}:{{ target.ssh_port }}</span>
@@ -76,16 +95,34 @@
                             </td>
                             <td class="py-3">
                                 <div class="flex items-center gap-2">
-                                    <form action="{{ url_for('test_compute_target', target_id=target.id) }}" method="POST" class="inline">
-                                        <button type="submit" class="text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 text-sm font-medium">
+                                    <button
+                                        type="button"
+                                        onclick='openEditModal({{ target|tojson }})'
+                                        class="action-link action-link-primary"
+                                        title="Compute targets are immutable: Edit creates a new target"
+                                    >
+                                        Edit
+                                    </button>
+                                    <form action="{{ url_for('copy_compute_target', target_id=target.id) }}" method="POST" class="inline-flex items-center">
+                                        <button type="submit" class="action-link action-link-blue">
+                                            Copy
+                                        </button>
+                                    </form>
+                                    <form action="{{ url_for('deactivate_compute_target', target_id=target.id) }}" method="POST" class="inline-flex items-center" onsubmit="return confirm('Deactivate this compute target? It will be hidden by default.')">
+                                        <button type="submit" class="action-link action-link-gray">
+                                            Deactivate
+                                        </button>
+                                    </form>
+                                    <form action="{{ url_for('test_compute_target', target_id=target.id) }}" method="POST" class="inline-flex items-center">
+                                        <button type="submit" class="action-link action-link-emerald">
                                             Test
                                         </button>
                                     </form>
-                                    <button type="button" onclick="provisionTarget('{{ target.id }}', '{{ target.name }}')" class="text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 text-sm font-medium">
+                                    <button type="button" onclick="provisionTarget('{{ target.id }}', '{{ target.name }}')" class="action-link action-link-amber">
                                         Provision
                                     </button>
-                                    <form action="{{ url_for('delete_compute_target', target_id=target.id) }}" method="POST" class="inline" onsubmit="return confirm('Delete this compute target?')">
-                                        <button type="submit" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium">
+                                    <form action="{{ url_for('delete_compute_target', target_id=target.id) }}" method="POST" class="inline-flex items-center" onsubmit="return confirm('Delete this compute target?')">
+                                        <button type="submit" class="action-link action-link-red">
                                             Delete
                                         </button>
                                     </form>
@@ -156,26 +193,26 @@
     <div class="fixed inset-0 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg relative">
             <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Add Compute Target</h3>
+                <h3 id="computeModalTitle" class="text-lg font-semibold text-gray-900 dark:text-gray-100">Add Compute Target</h3>
             </div>
             <form action="{{ url_for('add_compute_target') }}" method="POST" class="p-6 space-y-4">
                 <div class="form-group">
                     <label class="form-label">Name</label>
-                    <input type="text" name="name" required placeholder="My GPU Server" class="form-input">
+                    <input id="compute_name" type="text" name="name" required placeholder="My GPU Server" class="form-input">
                 </div>
                 <div class="grid grid-cols-3 gap-4">
                     <div class="col-span-2 form-group">
                         <label class="form-label">SSH Host</label>
-                        <input type="text" name="ssh_host" required placeholder="gpu.example.com" class="form-input">
+                        <input id="compute_ssh_host" type="text" name="ssh_host" required placeholder="gpu.example.com" class="form-input">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Port</label>
-                        <input type="number" name="ssh_port" value="22" required class="form-input">
+                        <input id="compute_ssh_port" type="number" name="ssh_port" value="22" required class="form-input">
                     </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">SSH User</label>
-                    <input type="text" name="ssh_user" required placeholder="ubuntu" class="form-input">
+                    <input id="compute_ssh_user" type="text" name="ssh_user" required placeholder="ubuntu" class="form-input">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Authentication Type</label>
@@ -186,16 +223,16 @@
                 </div>
                 <div id="keyAuthFields" class="form-group">
                     <label class="form-label">SSH Key Path</label>
-                    <input type="text" name="ssh_key_path" placeholder="~/.ssh/id_rsa" class="form-input">
+                    <input id="compute_ssh_key_path" type="text" name="ssh_key_path" placeholder="~/.ssh/id_rsa" class="form-input">
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Path to your private key file on this machine</p>
                 </div>
                 <div id="passwordAuthFields" class="form-group hidden">
                     <label class="form-label">SSH Password</label>
-                    <input type="password" name="ssh_password" class="form-input">
+                    <input id="compute_ssh_password" type="password" name="ssh_password" class="form-input">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Remote Work Directory</label>
-                    <input type="text" name="remote_work_dir" value="~/evalledger" class="form-input">
+                    <input id="compute_remote_work_dir" type="text" name="remote_work_dir" value="~/evalledger" class="form-input">
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Where to store code and artifacts on the remote server</p>
                 </div>
                 <div class="flex justify-end gap-3 pt-4">
@@ -295,12 +332,37 @@
 
 {% block scripts %}
 <script>
-function openAddModal() {
+function showComputeModal() {
     document.getElementById('addModal').classList.remove('hidden');
 }
 
 function closeAddModal() {
     document.getElementById('addModal').classList.add('hidden');
+}
+
+function openAddModal() {
+    document.getElementById('computeModalTitle').textContent = 'Add Compute Target';
+    showComputeModal();
+}
+
+function openEditModal(target) {
+    // Compute targets are immutable: editing creates a new target using these values as defaults.
+    document.getElementById('computeModalTitle').textContent = `Edit (creates new): ${target.name || ''}`;
+
+    document.getElementById('compute_name').value = target.name || '';
+    document.getElementById('compute_ssh_host').value = target.ssh_host || '';
+    document.getElementById('compute_ssh_port').value = target.ssh_port || 22;
+    document.getElementById('compute_ssh_user').value = target.ssh_user || '';
+    document.getElementById('compute_remote_work_dir').value = target.remote_work_dir || '~/evalledger';
+
+    // Auth fields
+    const authTypeEl = document.getElementById('authType');
+    authTypeEl.value = target.auth_type || 'key';
+    document.getElementById('compute_ssh_key_path').value = target.ssh_key_path || '';
+    document.getElementById('compute_ssh_password').value = target.ssh_password || '';
+    toggleAuthFields();
+
+    showComputeModal();
 }
 
 function toggleAuthFields() {

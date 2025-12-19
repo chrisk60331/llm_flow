@@ -17,7 +17,7 @@
 </div>
 
 <!-- Modal Backdrop -->
-<div id="modal-backdrop" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden" onclick="closeModal()"></div>
+<div id="modal-backdrop" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden" onclick="closeAllModals()"></div>
 
 <!-- Upload Plugin Modal -->
 <div id="upload-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
@@ -55,6 +55,103 @@
                     </div>
                 </form>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Plugin Modal -->
+<div id="view-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div class="flex min-h-full items-start justify-center p-4 pt-12">
+        <div class="relative w-full max-w-4xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700" onclick="event.stopPropagation()">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center gap-3">
+                    <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        <span id="view-plugin-name">Plugin Source</span>
+                        <span id="view-plugin-kind" class="ml-2 badge badge-blue text-xs"></span>
+                    </h2>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="copyToClipboard()" class="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                        Copy
+                    </button>
+                    <button onclick="switchToEdit()" class="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        Copy & Edit
+                    </button>
+                    <button onclick="closeViewModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <!-- Modal Body -->
+            <div class="p-4">
+                <div id="view-loading" class="flex items-center justify-center py-12">
+                    <svg class="animate-spin h-8 w-8 text-primary-600" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
+                <pre id="view-source" class="hidden bg-gray-900 text-gray-100 rounded-lg p-4 overflow-auto text-sm font-mono max-h-[60vh] leading-relaxed"><code></code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Copy & Edit Plugin Modal -->
+<div id="edit-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div class="flex min-h-full items-start justify-center p-4 pt-12">
+        <div class="relative w-full max-w-4xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700" onclick="event.stopPropagation()">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center gap-3">
+                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Create New Plugin</h2>
+                </div>
+                <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <!-- Modal Body -->
+            <form action="/plugins/create-from-source" method="post">
+                <div class="p-4 space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label class="form-label">Plugin Name</label>
+                            <input type="text" name="name" id="edit-plugin-name" class="form-input" required placeholder="my_new_plugin">
+                            <p class="text-xs text-gray-500 mt-1">Name for the new plugin (immutable once created)</p>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Kind</label>
+                            <select name="kind" id="edit-plugin-kind" class="form-select" required>
+                                <option value="lightning_module">lightning_module</option>
+                                <option value="dataloaders">dataloaders</option>
+                                <option value="benchmark">benchmark</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label flex items-center justify-between">
+                            <span>Source Code</span>
+                            <span class="text-xs text-gray-500 font-normal">Edit the code below, then save as new plugin</span>
+                        </label>
+                        <textarea name="source" id="edit-source" class="w-full h-[45vh] bg-gray-900 text-gray-100 rounded-lg p-4 text-sm font-mono resize-none focus:ring-2 focus:ring-primary-500 focus:outline-none" spellcheck="false" required></textarea>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" onclick="closeEditModal()" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Cancel</button>
+                    <button type="submit" class="btn-primary flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        Create New Plugin
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -146,9 +243,21 @@
                             <button onclick="toggleDropdown(this)" class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="4" r="2"/><circle cx="10" cy="10" r="2"/><circle cx="10" cy="16" r="2"/></svg>
                             </button>
-                            <div class="action-dropdown hidden absolute right-0 mt-1 w-24 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20">
+                            <div class="action-dropdown hidden absolute right-0 mt-1 w-32 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20">
+                                <button onclick="viewPlugin('{{ p.id }}')" class="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    View
+                                </button>
+                                <button onclick="copyEditPlugin('{{ p.id }}')" class="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                    Copy & Edit
+                                </button>
+                                <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
                                 <form action="/plugins/{{ p.id }}/delete" method="post" onsubmit="return confirm('Delete this plugin?')">
-                                    <button type="submit" class="w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700">Delete</button>
+                                    <button type="submit" class="w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                        Delete
+                                    </button>
                                 </form>
                             </div>
                         </div>
@@ -180,6 +289,9 @@
 </div>
 
 <script>
+  // Current plugin data for view/edit
+  let currentPluginData = null;
+
   // Dropdown toggle
   function toggleDropdown(btn) {
     const dropdown = btn.nextElementSibling;
@@ -206,8 +318,93 @@
     document.body.style.overflow = '';
   }
 
+  // View Modal Functions
+  async function viewPlugin(pluginId) {
+    document.querySelectorAll('.action-dropdown').forEach(d => d.classList.add('hidden'));
+    document.getElementById('modal-backdrop').classList.remove('hidden');
+    document.getElementById('view-modal').classList.remove('hidden');
+    document.getElementById('view-loading').classList.remove('hidden');
+    document.getElementById('view-source').classList.add('hidden');
+    document.body.style.overflow = 'hidden';
+
+    const resp = await fetch(`/api/plugins/${pluginId}/source`);
+    const data = await resp.json();
+
+    if (resp.ok) {
+      currentPluginData = data;
+      document.getElementById('view-plugin-name').textContent = data.name;
+      document.getElementById('view-plugin-kind').textContent = data.kind;
+      document.getElementById('view-source').querySelector('code').textContent = data.source;
+      document.getElementById('view-loading').classList.add('hidden');
+      document.getElementById('view-source').classList.remove('hidden');
+    } else {
+      closeViewModal();
+      alert('Failed to load plugin source: ' + (data.detail || 'Unknown error'));
+    }
+  }
+
+  function closeViewModal() {
+    document.getElementById('modal-backdrop').classList.add('hidden');
+    document.getElementById('view-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+    currentPluginData = null;
+  }
+
+  function copyToClipboard() {
+    const source = currentPluginData?.source || '';
+    navigator.clipboard.writeText(source).then(() => {
+      const btn = event.target.closest('button');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied!';
+      setTimeout(() => { btn.innerHTML = originalHtml; }, 1500);
+    });
+  }
+
+  function switchToEdit() {
+    closeViewModal();
+    if (currentPluginData) {
+      openEditModal(currentPluginData.source, currentPluginData.name + '_copy', currentPluginData.kind);
+    }
+  }
+
+  // Edit Modal Functions
+  async function copyEditPlugin(pluginId) {
+    document.querySelectorAll('.action-dropdown').forEach(d => d.classList.add('hidden'));
+
+    const resp = await fetch(`/api/plugins/${pluginId}/source`);
+    const data = await resp.json();
+
+    if (resp.ok) {
+      currentPluginData = data;
+      openEditModal(data.source, data.name + '_copy', data.kind);
+    } else {
+      alert('Failed to load plugin source: ' + (data.detail || 'Unknown error'));
+    }
+  }
+
+  function openEditModal(source, name, kind) {
+    document.getElementById('modal-backdrop').classList.remove('hidden');
+    document.getElementById('edit-modal').classList.remove('hidden');
+    document.getElementById('edit-source').value = source || '';
+    document.getElementById('edit-plugin-name').value = name || '';
+    document.getElementById('edit-plugin-kind').value = kind || 'lightning_module';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeEditModal() {
+    document.getElementById('modal-backdrop').classList.add('hidden');
+    document.getElementById('edit-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  function closeAllModals() {
+    closeModal();
+    closeViewModal();
+    closeEditModal();
+  }
+
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') closeAllModals();
   });
 
   // Sorting
